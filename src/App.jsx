@@ -11,7 +11,7 @@ import { useState, useEffect, useRef } from "react";
 // back to the static ledger.json values.
 // ---------------------------------------------------------------------------
 const LIVE_OWNER = "AusRabbit";
-const LIVE_REPO = "SWRPG_Salvage_Rights_Dashboard";
+const LIVE_REPO = "SWRPG_The_Emperors_Expendables_Dashboard";
 const LIVE_PATH = "data/live.json";
 const LIVE_POLL_MS = 90_000;
 
