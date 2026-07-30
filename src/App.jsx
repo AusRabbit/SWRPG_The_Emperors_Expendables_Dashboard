@@ -2,18 +2,24 @@ import { useState, useEffect, useRef } from "react";
 
 // ---------------------------------------------------------------------------
 // Full character/party dashboard (static, bundled ledger.json), with
-// Wounds / Strain / Destiny overlaid live from THIS SAME repo's
-// data/live.json via the GitHub Contents API (works because this repo is
-// public). Matching: each ledger character carries an optional "liveId"
-// field; if it matches a key in live.json's wounds/strain maps, that
-// character's current Wounds/Strain are overridden. Destiny is party-wide.
+// Wounds / Strain / Destiny overlaid live via this site's own /live proxy
+// (a Cloudflare Worker route — see worker/index.js). The proxy fetches
+// data/live.json from this repo using an authenticated GitHub token
+// (5,000 req/hour) and edge-caches for 10s, so the browser never hits
+// GitHub's 60/hour unauthenticated limit directly, no matter how many
+// viewers or tabs are open. Poll interval matches the cache TTL.
+//
+// Matching: each ledger character can carry an optional "liveId" field.
+// If it matches a key in the live board's wounds/strain maps, that
+// character's current Wounds/Strain are overridden with the live value.
+// Destiny is party-wide: if the live fetch succeeds, its destiny value
+// replaces every character's destiny uniformly.
+//
 // If the live fetch fails or a character has no liveId, everything falls
-// back to the static ledger.json values.
+// back to the static ledger.json values — the page never breaks, it just
+// stops being "live" for that piece of data.
 // ---------------------------------------------------------------------------
-const LIVE_OWNER = "AusRabbit";
-const LIVE_REPO = "SWRPG_The_Emperors_Expendables_Dashboard";
-const LIVE_PATH = "data/live.json";
-const LIVE_POLL_MS = 90_000;
+const LIVE_POLL_MS = 10_000;
 
 const DEMO_LEDGER = {
   campaign: "Ghosts in Hyperspace",
@@ -264,11 +270,8 @@ export default function CampaignDashboard() {
 
   const fetchLiveOverlay = async () => {
     try {
-      const url = `https://api.github.com/repos/${LIVE_OWNER}/${LIVE_REPO}/contents/${LIVE_PATH}?_=${Date.now()}`;
-      const res = await fetch(url, {
-        headers: { Accept: "application/vnd.github.raw" },
-        cache: "no-store",
-      });
+      const url = `/live?_=${Date.now()}`;
+      const res = await fetch(url, { cache: "no-store" });
       const remaining = res.headers.get("x-ratelimit-remaining");
       const limit = res.headers.get("x-ratelimit-limit");
       if (remaining != null) setRateLimit({ remaining: Number(remaining), limit: Number(limit) });
@@ -438,8 +441,9 @@ export default function CampaignDashboard() {
         {showSource && (
           <div className="mb-4 p-4 border text-sm" style={{ borderColor: "#3a3f42", background: "#16191b" }}>
             <p className="text-[11px] leading-relaxed mb-2" style={{ color: "#8a8f93" }}>
-              Loads <code style={{ color: "#e7e2d2" }}>/data/ledger.json</code> at build time, and polls{" "}
-              <code style={{ color: "#e7e2d2" }}>{LIVE_REPO}/{LIVE_PATH}</code> every 90s for live Wounds/Strain/Destiny.
+              Loads <code style={{ color: "#e7e2d2" }}>/data/ledger.json</code> at build time, and polls this site's own{" "}
+              <code style={{ color: "#e7e2d2" }}>/live</code> route every 10s for live Wounds/Strain/Destiny — a Cloudflare
+              Worker that fetches GitHub with an authenticated token server-side, so this browser never talks to GitHub directly.
               Live status: <span style={{ color: anyLive ? "#6fae60" : "#c23b3b" }}>{anyLive ? "connected" : (live.errorMsg || "not yet connected")}</span>.
             </p>
             <textarea
