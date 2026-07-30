@@ -1,0 +1,115 @@
+{
+  "campaign": "Salvage Rights",
+  "characters": [
+    {
+      "name": "Kess Varyn",
+      "liveId": "kess",
+      "career": "Explorer/Engineer — Former Professor",
+      "species": "Human",
+      "updated": "2026-07-10T00:00:00Z",
+      "vitals": {
+        "wounds": { "current": 0, "threshold": 12 },
+        "strain": { "current": 0, "threshold": 11 },
+        "soak": 3,
+        "criticalInjuries": []
+      },
+      "destiny": { "light": 1, "dark": 2 },
+      "xp": { "available": 5, "total": 0 },
+      "credits": 0,
+      "inventory": [
+        { "name": "Party sale proceeds", "note": "35,000 credits held in a shared party pool, allocation unverified" },
+        { "name": "Blaster Pistol", "note": "exact profile unverified in source ledger" },
+        { "name": "Captured Cygnus Carbine", "note": "exact profile unverified in source ledger" },
+        { "name": "Mechanic Toolkit, Portable Scanner, Utility Harness" },
+        { "name": "Heavy Work Jacket", "note": "+1 Soak, included in derived stats" },
+        { "name": "Cygnus Berth Clearance Tag" }
+      ],
+      "motivationObligation": {
+        "motivation": "Strongly tempted by dangerous knowledge and technology — tempered by mission discipline and Sel's steadying presence",
+        "obligation": { "type": "", "value": 0, "note": "" }
+      },
+      "characteristics": { "brawn": 2, "agility": 3, "intellect": 4, "cunning": 2, "willpower": 2, "presence": 2 },
+      "skills": [
+        { "name": "Astrogation", "rank": 1, "career": true },
+        { "name": "Computers", "rank": 1, "career": true },
+        { "name": "Cool", "rank": 1, "career": false },
+        { "name": "Cybernetics", "rank": 1, "career": false },
+        { "name": "Discipline", "rank": 1, "career": true },
+        { "name": "Knowledge: Education", "rank": 1, "career": false },
+        { "name": "Knowledge: Outer Rim", "rank": 1, "career": true },
+        { "name": "Knowledge: Xenology", "rank": 1, "career": true },
+        { "name": "Mechanics", "rank": 2, "career": true },
+        { "name": "Negotiation", "rank": 1, "career": false },
+        { "name": "Perception", "rank": 1, "career": true },
+        { "name": "Piloting: Space", "rank": 2, "career": true },
+        { "name": "Ranged: Light", "rank": 1, "career": false },
+        { "name": "Skulduggery", "rank": 1, "career": false },
+        { "name": "Streetwise", "rank": 1, "career": true },
+        { "name": "Vigilance", "rank": 1, "career": false }
+      ],
+      "talents": [
+        { "name": "Clever Retort", "rank": 1, "tier": 1, "description": "Once per encounter, add two automatic Threat to another character's social check." },
+        { "name": "Solid Repairs", "rank": 1, "tier": 1, "description": "Repairs +1 hull trauma per rank whenever Kess repairs a starship or vehicle." },
+        { "name": "Former Professor — Xenology", "rank": 1, "tier": 1, "description": "Knowledge: Xenology becomes a career skill. Once per session, collect a small favour from a higher-learning contact." },
+        { "name": "Signature Vehicle — Wayfarer's Debt", "rank": 1, "tier": 1, "description": "Upgrade Mechanics checks made to work on the Wayfarer's Debt once. Silhouette prerequisite unverified; campaign purchase accepted." },
+        { "name": "Fine Tuning", "rank": 1, "tier": 2, "description": "Reduce 1 additional system strain per rank when reducing a starship/vehicle's system strain." },
+        { "name": "Scathing Tirade", "rank": 1, "tier": 2, "description": "Average Coercion check; successes and Advantage may inflict strain on enemies at short range." },
+        { "name": "Pride and Joy — Wayfarer's Debt", "rank": 1, "tier": 2, "description": "Upgrade social checks made within short range of the named vehicle, if the silhouette prerequisite is met (unverified)." },
+        { "name": "Applied Research", "rank": 1, "tier": 3, "description": "Once per session, use an appropriate Knowledge skill and Intellect in place of a required skill/characteristic when justified by research." },
+        { "name": "Distinctive Style", "rank": 1, "tier": 3, "description": "Before a Computers check to hack/breach a secured system, add two Success and two Threat to the result." },
+        { "name": "Gearhead", "rank": 1, "tier": 1, "description": "Removes one Setback die from Mechanics checks per rank and halves attachment-mod credit costs. Exact tier/rank unverified in the restored ledger — listed as a single purchase." }
+      ],
+      "weapons": [],
+      "armor": { "name": "Heavy Work Jacket", "soakBonus": 1, "defenseBonus": 0 }
+    },
+    {
+      "name": "Carsk Den'Niv",
+      "liveId": "carsk",
+      "career": "Hired Gun — Bodyguard",
+      "species": "Bothan",
+      "updated": "2026-07-10T00:00:00Z",
+      "vitals": {
+        "wounds": { "current": 0, "threshold": 13 },
+        "strain": { "current": 0, "threshold": 14 },
+        "soak": 5,
+        "criticalInjuries": []
+      },
+      "destiny": { "light": 1, "dark": 2 },
+      "xp": { "available": 0, "total": 0 },
+      "credits": 0,
+      "inventory": [
+        { "name": "Party sale proceeds", "note": "35,000 credits held in a shared party pool, allocation unverified" },
+        { "name": "Comlink and utility belt" },
+        { "name": "Power packs", "note": "one standard reload, one captured Cygnus power pack" },
+        { "name": "Utility items", "note": "maintenance gloves, glowrod, sealed breath mask, compact utility cutter" },
+        { "name": "Encrypted bounty puck", "note": "recovered from Drenn — partial Kallax contract/claim data" },
+        { "name": "Drenn's comm", "note": "may contain recent Kallax-team communications" }
+      ],
+      "motivationObligation": {
+        "motivation": "Collects fragments of rebel intelligence hoping to find those responsible for his family's deaths, or harm the wider movement that took them",
+        "obligation": { "type": "Obsession", "value": 20, "note": "Triggered this session — the planet's colours stir the memory; all PCs at -1 strain threshold this session, Carsk at -2" }
+      },
+      "characteristics": { "brawn": 3, "agility": 3, "intellect": 2, "cunning": 3, "willpower": 3, "presence": 2 },
+      "skills": [
+        { "name": "Athletics", "rank": 2, "career": true },
+        { "name": "Discipline", "rank": 1, "career": true },
+        { "name": "Perception", "rank": 3, "career": true },
+        { "name": "Ranged: Heavy", "rank": 1, "career": true },
+        { "name": "Ranged: Light", "rank": 1, "career": true },
+        { "name": "Resilience", "rank": 1, "career": true },
+        { "name": "Vigilance", "rank": 1, "career": true }
+      ],
+      "talents": [
+        { "name": "Rapid Recovery", "rank": 1, "tier": 1, "description": "Exact mechanical text unverified in the restored ledger; talent and tier are confirmed." },
+        { "name": "Worlds War Vet", "rank": 1, "tier": 1, "description": "Ranged (Heavy) or Resilience becomes a career skill. Once per session, call in a small favour from current/former military personnel connected to his service background." },
+        { "name": "Bad Cop", "rank": 1, "tier": 2, "description": "Spend Advantage on a Coercion or Deception check to upgrade an ally's later social check against the same target during the encounter." }
+      ],
+      "weapons": [
+        { "name": "Blaster Rifle", "skill": "Ranged: Heavy", "damage": 9, "crit": 3, "range": "Long", "special": "Stun setting" },
+        { "name": "Blaster Pistol", "skill": "Ranged: Light", "damage": 6, "crit": 3, "range": "Medium", "special": "Stun setting" },
+        { "name": "Vibroknife", "skill": "Melee", "damage": "Brawn+1", "crit": 2, "range": "Engaged", "special": "Pierce 2" }
+      ],
+      "armor": { "name": "Modified Cresh \"Luck\" Armour", "soakBonus": 2, "defenseBonus": 1 }
+    }
+  ]
+}
