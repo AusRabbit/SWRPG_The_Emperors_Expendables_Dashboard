@@ -11,7 +11,11 @@ const CACHE_SECONDS = 10;
 
 async function handleLive(request, env, ctx) {
   const cache = caches.default;
-  const cacheKey = new Request("https://internal-cache.local/live-overlay", request);
+  // Cache key must be unique per deployment — on workers.dev, caches.default
+  // is not reliably zone-scoped, so using the same literal key across
+  // multiple Workers can cause one Worker to read/overwrite another's
+  // cached response. Embedding OWNER/REPO/PATH guarantees no collisions.
+  const cacheKey = new Request(`https://internal-cache.local/live-overlay/${OWNER}/${REPO}/${PATH}`, request);
 
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
