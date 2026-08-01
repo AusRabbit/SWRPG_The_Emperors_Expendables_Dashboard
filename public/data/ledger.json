@@ -41,7 +41,7 @@
         { "name": "Hidden Storage", "rank": 1, "tier": 1, "description": "Gain hidden storage in vehicles or equipment with total encumbrance equal to ranks." },
         { "name": "Quick Draw", "rank": 1, "tier": 1, "description": "Once per round, draw or holster an easily accessible weapon/item as an incidental; reduces Prepare rating by 1 to minimum 1." },
         { "name": "Deep Pockets", "rank": 1, "tier": 1, "description": "Once per session, produce a small narratively useful item from pockets/bag; generally under 100 credits and encumbrance 0–1, subject to GM approval." },
-        { "name": "Stalker", "rank": 1, "tier": 2, "description": "Add Boost per rank to Stealth and Coordination checks." }
+        { "name": "Stalker", "rank": 1, "tier": 2, "description": "Add Boost per rank to Stealth and Coordination checks.", "boostsSkills": ["Stealth", "Coordination"] }
       ],
       "weapons": [],
       "armor": { "name": "None currently worn", "soakBonus": 0, "defenseBonus": 0 }
@@ -89,7 +89,7 @@
         { "name": "Rapid Recovery", "rank": 1, "tier": 1, "description": "Heal 1 additional strain per rank when healing strain after an encounter." },
         { "name": "Painful Blow", "rank": 1, "tier": 1, "description": "May increase combat check difficulty by one; if the target suffers wounds, it suffers 2 strain each time it performs a maneuver until encounter end." },
         { "name": "Desperate Recovery", "rank": 1, "tier": 1, "description": "Before healing strain after an encounter, if current strain is more than half threshold, heal 2 additional strain." },
-        { "name": "Physical Training", "rank": 1, "tier": 2, "description": "Add Boost per rank to Athletics and Resilience checks." }
+        { "name": "Physical Training", "rank": 1, "tier": 2, "description": "Add Boost per rank to Athletics and Resilience checks.", "boostsSkills": ["Athletics", "Resilience"] }
       ],
       "weapons": [],
       "armor": { "name": "None currently worn", "soakBonus": 0, "defenseBonus": 0 }
