@@ -7,7 +7,8 @@ import { useState, useEffect, useRef } from "react";
 // data/live.json from this repo using an authenticated GitHub token
 // (5,000 req/hour) and edge-caches for 10s, so the browser never hits
 // GitHub's 60/hour unauthenticated limit directly, no matter how many
-// viewers or tabs are open. Poll interval matches the cache TTL.
+// viewers or tabs are open. Poll interval matches the cache TTL — polling
+// faster than the cache refreshes wouldn't get fresher data anyway.
 //
 // Matching: each ledger character can carry an optional "liveId" field.
 // If it matches a key in the live board's wounds/strain maps, that
@@ -18,6 +19,11 @@ import { useState, useEffect, useRef } from "react";
 // If the live fetch fails or a character has no liveId, everything falls
 // back to the static ledger.json values — the page never breaks, it just
 // stops being "live" for that piece of data.
+//
+// Talent-granted skill boosts: a talent may carry "boostsSkills": ["Skill
+// Name", ...] to represent a "add Boost die per rank to X checks" effect.
+// buildSkills() sums matching talent ranks per skill and attaches it as
+// `boost`, rendered as a small triangle badge next to that skill's dice pips.
 // ---------------------------------------------------------------------------
 const LIVE_POLL_MS = 10_000;
 
@@ -34,20 +40,44 @@ const DEMO_LEDGER = {
         wounds: { current: 6, threshold: 14 },
         strain: { current: 9, threshold: 12 },
         soak: 4,
-        criticalInjuries: [],
+        criticalInjuries: ["Grazed — minor bleeding (Easy check to stop)"],
       },
       destiny: { light: 2, dark: 1 },
       xp: { available: 8, total: 45 },
       credits: 1350,
-      inventory: [{ name: "Heavy Blaster Pistol", note: "Mod: +1 crit rating" }],
+      inventory: [
+        { name: "Heavy Blaster Pistol", note: "Mod: +1 crit rating" },
+        { name: "Armored Flight Suit", note: "+1 Soak" },
+        { name: "Comlink (encrypted)" },
+        { name: "Stimpack ×2" },
+      ],
       motivationObligation: {
         motivation: "Freedom — flying her own ship, on her own terms",
         obligation: { type: "Debt", value: 15, note: "Owed to Hylo Bassiro" },
       },
       characteristics: { brawn: 2, agility: 4, intellect: 2, cunning: 3, willpower: 2, presence: 3 },
-      skills: [{ name: "Piloting: Space", rank: 3, career: true }],
-      talents: [{ name: "Skilled Jockey", rank: 2, tier: 2, description: "Add Boost per rank to Piloting checks." }],
-      weapons: [{ name: "Heavy Blaster Pistol", skill: "Ranged: Light", damage: 7, crit: 3, range: "Medium", special: "—" }],
+      skills: [
+        { name: "Piloting: Space", rank: 3, career: true },
+        { name: "Piloting: Planetary", rank: 2, career: true },
+        { name: "Gunnery", rank: 2, career: true },
+        { name: "Streetwise", rank: 2, career: true },
+        { name: "Perception", rank: 1, career: false },
+        { name: "Cool", rank: 2, career: true },
+        { name: "Ranged (Light)", rank: 2, career: false },
+        { name: "Mechanics", rank: 1, career: false },
+        { name: "Deception", rank: 1, career: false },
+      ],
+      talents: [
+        { name: "Skilled Jockey", rank: 2, tier: 2, description: "Add Boost per rank to Piloting checks when in silhouette 3 or smaller vehicle." },
+        { name: "Dodge", rank: 1, tier: 1, description: "Suffer strain equal to ranks to upgrade difficulty of an incoming combat check once per rank." },
+        { name: "Full Throttle", rank: 1, tier: 1, description: "Increase a piloted vehicle's speed by 1 as a maneuver; costs 2 strain." },
+        { name: "Quick Draw", rank: 1, tier: 1, description: "Draw or holster an easily accessible weapon/item as an incidental once per round." },
+        { name: "Grit", rank: 1, tier: 1, description: "Increase strain threshold by 1 per rank." },
+      ],
+      weapons: [
+        { name: "Heavy Blaster Pistol", skill: "Ranged (Light)", damage: 7, crit: 3, range: "Medium", special: "—" },
+        { name: "Vibroknife", skill: "Melee", damage: 4, crit: 2, range: "Engaged", special: "Pierce 2" },
+      ],
       armor: { name: "Armored Flight Suit", soakBonus: 1, defenseBonus: 0 },
     },
   ],
@@ -76,9 +106,9 @@ const SAMPLE_SCHEMA = `{
       },
       "characteristics": { "brawn": 0, "agility": 0, "intellect": 0, "cunning": 0, "willpower": 0, "presence": 0 },
       "skills": [{ "name": "string", "rank": 0, "career": true }],
-      "talents": [{ "name": "string", "rank": 0, "tier": 1, "description": "string (effect/rules text, optional)" }],
+      "talents": [{ "name": "string", "rank": 0, "tier": 1, "description": "string (effect/rules text, optional)", "boostsSkills": ["Skill Name, ... (optional — for talents that grant Boost dice per rank to specific skills)"] }],
       "weapons": [{ "name": "string", "skill": "string", "damage": 0, "crit": 0, "range": "string", "special": "string" }],
-      "armor": { "name": "string", "soakBonus": 0, "defenseBonus": 0 }
+      "armor": { "name": "string", "soakBonus": 0, "rangedDefense": 0, "meleeDefense": 0, "defenseBonus": "0 (legacy single value, used for both if rangedDefense/meleeDefense absent)" }
     }
   ]
 }`;
@@ -131,6 +161,17 @@ function buildSkills(character) {
   const chars = character?.characteristics || {};
   const rawSkills = character?.skills || [];
   const skillMap = new Map(rawSkills.map((s) => [normalizeSkillName(s.name), s]));
+
+  const boostMap = new Map();
+  (character?.talents || []).forEach((t) => {
+    if (Array.isArray(t.boostsSkills)) {
+      t.boostsSkills.forEach((skillName) => {
+        const key = normalizeSkillName(skillName);
+        boostMap.set(key, (boostMap.get(key) || 0) + (t.rank || 1));
+      });
+    }
+  });
+
   return FULL_SKILL_LIST.map((canon) => {
     const match = skillMap.get(normalizeSkillName(canon.name));
     return {
@@ -140,8 +181,16 @@ function buildSkills(character) {
       rank: match?.rank ?? 0,
       career: match?.career ?? false,
       characteristic: chars[canon.char] ?? 0,
+      boost: boostMap.get(normalizeSkillName(canon.name)) || 0,
     };
   });
+}
+
+function getDefense(character) {
+  const armor = character?.armor || {};
+  const ranged = armor.rangedDefense ?? armor.defenseBonus ?? 0;
+  const melee = armor.meleeDefense ?? armor.defenseBonus ?? 0;
+  return { ranged, melee };
 }
 
 function PipRow({ current, threshold, colorClass, size = "normal" }) {
@@ -164,23 +213,37 @@ function PipRow({ current, threshold, colorClass, size = "normal" }) {
   );
 }
 
-function SkillPips({ rank, characteristic }) {
+function SkillPips({ rank, characteristic, boost = 0 }) {
   const total = Math.max(rank, characteristic);
   const yellow = Math.min(rank, characteristic);
-  if (total === 0) return <span className="text-[11px]" style={{ color: "#3a3f42" }}>—</span>;
   return (
-    <span className="flex gap-1">
-      {Array.from({ length: total }, (_, i) => (
+    <span className="flex items-center gap-1">
+      {total === 0 ? (
+        <span className="text-[11px]" style={{ color: "#3a3f42" }}>—</span>
+      ) : (
+        <span className="flex gap-1">
+          {Array.from({ length: total }, (_, i) => (
+            <span
+              key={i}
+              className="w-2.5 h-2.5 border"
+              style={{
+                borderColor: i < yellow ? "#f5c518" : "#6fae60",
+                background: i < yellow ? "#f5c518" : "#6fae60",
+                boxShadow: i < yellow ? "0 0 4px #f5c51899" : "0 0 4px #6fae6099",
+              }}
+            />
+          ))}
+        </span>
+      )}
+      {boost > 0 && (
         <span
-          key={i}
-          className="w-2.5 h-2.5 border"
-          style={{
-            borderColor: i < yellow ? "#f5c518" : "#6fae60",
-            background: i < yellow ? "#f5c518" : "#6fae60",
-            boxShadow: i < yellow ? "0 0 4px #f5c51899" : "0 0 4px #6fae6099",
-          }}
-        />
-      ))}
+          className="text-[10px] leading-none"
+          style={{ color: "#5ec8d8" }}
+          title={`+${boost} Boost die from talents`}
+        >
+          ▲{boost > 1 ? `×${boost}` : ""}
+        </span>
+      )}
     </span>
   );
 }
@@ -268,6 +331,10 @@ export default function CampaignDashboard() {
     return () => clearTimeout(bootTimer.current);
   }, []);
 
+  useEffect(() => {
+    document.title = ledger.campaign ? `${ledger.campaign} — Character Sheets` : "Character Sheets";
+  }, [ledger.campaign]);
+
   const fetchLiveOverlay = async () => {
     try {
       const url = `/live?_=${Date.now()}`;
@@ -344,6 +411,7 @@ export default function CampaignDashboard() {
   const talents = [...(active.talents || [])].sort((a, b) => (a.tier ?? 99) - (b.tier ?? 99));
   const weapons = active.weapons || [];
   const armor = active.armor || {};
+  const activeDefense = getDefense(active);
 
   const CHAR_LABELS = [
     ["brawn", "BR"], ["agility", "AG"], ["intellect", "INT"],
@@ -503,16 +571,16 @@ export default function CampaignDashboard() {
                 <span className="flex items-center gap-1">
                   <span className="w-2.5 h-2.5 inline-block" style={{ background: "#6fae60" }} /> ability dice
                 </span>
-                <span style={{ color: "#5ec8d8" }}>career skill</span>
+                <span className="flex items-center gap-1" style={{ color: "#5ec8d8" }}>▲ talent boost die</span>
               </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-[12px]" style={{ color: "#e7e2d2", minWidth: `${280 + party.length * 110}px` }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid #2a2e31" }}>
-                      <th className="text-left font-normal pb-2" style={{ color: "#5a5f62" }}>Skill</th>
+                      <th className="text-left font-normal pb-2" style={{ color: "#5a5f62" }}></th>
                       {party.map((p, i) => (
-                        <th key={i} className="text-left font-normal pb-2 px-2" style={{ color: "#8a8f93", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
+                        <th key={i} className="text-left font-normal pb-2 px-2 text-[14px]" style={{ color: "#8a8f93", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
                           {p.name || `Character ${i + 1}`}
                         </th>
                       ))}
@@ -522,7 +590,7 @@ export default function CampaignDashboard() {
                     <tr>
                       <td className="pt-2 pb-1 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>Wounds</td>
                       {partyOverlays.map((o, i) => (
-                        <td key={i} className="pt-2 pb-1 px-2 mono-num" style={{ color: severityColor(o.wounds.current, o.wounds.threshold) }}>
+                        <td key={i} className="pt-2 pb-1 px-2 mono-num text-[14px]" style={{ color: severityColor(o.wounds.current, o.wounds.threshold) }}>
                           {o.wounds.current} / {o.wounds.threshold}{o.woundsLive && <span className="ml-1" style={{ color: "#6fae60" }}>●</span>}
                         </td>
                       ))}
@@ -530,7 +598,7 @@ export default function CampaignDashboard() {
                     <tr>
                       <td className="py-1 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>Strain</td>
                       {partyOverlays.map((o, i) => (
-                        <td key={i} className="py-1 px-2 mono-num" style={{ color: severityColor(o.strain.current, o.strain.threshold) }}>
+                        <td key={i} className="py-1 px-2 mono-num text-[14px]" style={{ color: severityColor(o.strain.current, o.strain.threshold) }}>
                           {o.strain.current} / {o.strain.threshold}{o.strainLive && <span className="ml-1" style={{ color: "#6fae60" }}>●</span>}
                         </td>
                       ))}
@@ -538,60 +606,64 @@ export default function CampaignDashboard() {
                     <tr>
                       <td className="py-1 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>Soak</td>
                       {party.map((p, i) => (
-                        <td key={i} className="py-1 px-2 mono-num" style={{ color: "#e7e2d2" }}>{p.vitals?.soak ?? "—"}</td>
+                        <td key={i} className="py-1 px-2 mono-num text-[14px]" style={{ color: "#e7e2d2" }}>{p.vitals?.soak ?? "—"}</td>
                       ))}
                     </tr>
                     <tr>
-                      <td className="py-1 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>Defense</td>
-                      {party.map((p, i) => (
-                        <td key={i} className="py-1 px-2 mono-num" style={{ color: "#e7e2d2" }}>{p.armor?.defenseBonus ?? 0}</td>
-                      ))}
+                      <td className="py-1 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>Defense (R/M)</td>
+                      {party.map((p, i) => {
+                        const d = getDefense(p);
+                        return <td key={i} className="py-1 px-2 mono-num text-[14px]" style={{ color: "#e7e2d2" }}>{d.ranged}/{d.melee}</td>;
+                      })}
                     </tr>
                     <tr style={{ borderBottom: "1px solid #2a2e31" }}>
                       <td className="py-1 pb-2 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>Critical Injuries</td>
                       {party.map((p, i) => {
                         const n = (p.vitals?.criticalInjuries || []).length;
                         return (
-                          <td key={i} className="py-1 pb-2 px-2">
+                          <td key={i} className="py-1 pb-2 px-2 text-[14px]">
                             {n === 0 ? (
                               <span style={{ color: "#3a3f42" }}>—</span>
                             ) : (
                               <span className="flex items-center gap-1">
                                 {Array.from({ length: Math.min(n, 5) }, (_, k) => (
-                                  <span key={k} className="w-2 h-2 inline-block" style={{ background: "#c23b3b" }} />
+                                  <span key={k} className="w-2.5 h-2.5 inline-block" style={{ background: "#c23b3b" }} />
                                 ))}
-                                {n > 5 && <span className="text-[10px] mono-num" style={{ color: "#c23b3b" }}>+{n - 5}</span>}
+                                {n > 5 && <span className="text-[12px] mono-num" style={{ color: "#c23b3b" }}>+{n - 5}</span>}
                               </span>
                             )}
                           </td>
                         );
                       })}
                     </tr>
-                    {["General", "Combat", "Knowledge"].map((group) => {
+                    <tr>
+                      <td colSpan={party.length + 1} className="pt-3 pb-1 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>
+                        Skill
+                      </td>
+                    </tr>
+                    {["General", "Combat", "Knowledge"].flatMap((group) => {
                       const rows = partySkillNames.filter((s) => s.group === group);
-                      if (rows.length === 0) return null;
-                      return (
-                        <>
-                          <tr key={`${group}-header`}>
-                            <td colSpan={party.length + 1} className="pt-3 pb-1 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>
-                              {group}
-                            </td>
+                      if (rows.length === 0) return [];
+                      return [
+                        <tr key={`${group}-header`}>
+                          <td colSpan={party.length + 1} className="pt-3 pb-1 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>
+                            {group}
+                          </td>
+                        </tr>,
+                        ...rows.map((skillDef) => (
+                          <tr key={`${group}-${skillDef.name}`} style={{ borderTop: "1px solid #2a2e31" }}>
+                            <td className="py-1.5 pr-3">{skillDef.name}</td>
+                            {partySkillSets.map((set, ci) => {
+                              const s = set.find((x) => x.name === skillDef.name);
+                              return (
+                                <td key={ci} className="py-1.5 px-2">
+                                  <SkillPips rank={s?.rank ?? 0} characteristic={s?.characteristic ?? 0} boost={s?.boost ?? 0} />
+                                </td>
+                              );
+                            })}
                           </tr>
-                          {rows.map((skillDef, i) => (
-                            <tr key={i} style={{ borderTop: "1px solid #2a2e31" }}>
-                              <td className="py-1.5 pr-3">{skillDef.name}</td>
-                              {partySkillSets.map((set, ci) => {
-                                const s = set.find((x) => x.name === skillDef.name);
-                                return (
-                                  <td key={ci} className="py-1.5 px-2">
-                                    <SkillPips rank={s?.rank ?? 0} characteristic={s?.characteristic ?? 0} />
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
-                        </>
-                      );
+                        )),
+                      ];
                     })}
                     <tr style={{ borderTop: "1px solid #2a2e31" }}>
                       <td className="pt-3 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>Unspent XP</td>
@@ -751,6 +823,7 @@ export default function CampaignDashboard() {
                         <span className="w-2.5 h-2.5 inline-block" style={{ background: "#6fae60" }} /> ability
                       </span>
                       <span style={{ color: "#5ec8d8" }}>career skill</span>
+                      <span style={{ color: "#5ec8d8" }}>▲ talent boost</span>
                     </div>
                   </div>
                   {["General", "Combat", "Knowledge"].map((group) => (
@@ -760,7 +833,7 @@ export default function CampaignDashboard() {
                         {skills.filter((s) => s.group === group).map((s, i) => (
                           <div key={i} className="text-[13px] flex items-center justify-between gap-3">
                             <span style={{ color: s.career ? "#5ec8d8" : "#e7e2d2" }}>{s.name}</span>
-                            <SkillPips rank={s.rank} characteristic={s.characteristic} />
+                            <SkillPips rank={s.rank} characteristic={s.characteristic} boost={s.boost} />
                           </div>
                         ))}
                       </div>
@@ -833,7 +906,7 @@ export default function CampaignDashboard() {
                       <div className="text-[11px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8a8f93" }}>Armor</div>
                       <div className="text-[13px] flex justify-between">
                         <span style={{ color: "#e7e2d2" }}>{armor.name}</span>
-                        <span style={{ color: "#8a8f93" }}>+{armor.soakBonus ?? 0} Soak · +{armor.defenseBonus ?? 0} Defense</span>
+                        <span style={{ color: "#8a8f93" }}>+{armor.soakBonus ?? 0} Soak · Defense (R/M) {activeDefense.ranged}/{activeDefense.melee}</span>
                       </div>
                     </>
                   )}
