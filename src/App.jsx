@@ -24,8 +24,63 @@ import { useState, useEffect, useRef } from "react";
 // Name", ...] to represent a "add Boost die per rank to X checks" effect.
 // buildSkills() sums matching talent ranks per skill and attaches it as
 // `boost`, rendered as a small triangle badge next to that skill's dice pips.
+//
+// Live-change highlight: whenever Wounds/Strain/Destiny change via the live
+// overlay, the affected pip/token row gets a one-shot directional "sweep" —
+// bottom-to-top in the stat's own color when the number goes UP, top-to-
+// bottom in green when it goes DOWN. See lastChangeRef / SWEEP_MS below.
 // ---------------------------------------------------------------------------
 const LIVE_POLL_MS = 10_000;
+const SWEEP_MS = 950;
+const PULSE_MS = 2400;
+
+const BLUE_TOKEN_B64 =
+  "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" +
+  "TRo0aM2f/9k=";
+const RED_TOKEN_B64 =
+  "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" +
+  "Sq9KgwxsCekZBOWK5J0WCd4AZV2OcyvIPCu+Qin+ulgoameRR9E4Z6iOMjPWyLwp7AIxBOecY17v9Dt28Xult22KX+w26Py6iueQt9bIOWc89PSOeQACM+3SB233cdbu/wA2itFC1rtrZM8kkmaipBJyZXPCg5+3tzgltD4HoLRZ3ldP+nKxQMhKvcHH8EeeRH/M/wAc" +
+  "dyF0BJbpXeUIgT8l2w7eYP3VLBHa4EaMmeqdZqfJIMVMoZQcY58xiT+BEDj1A6mluvrp7lWS1dSwaWU5OBgD2AAHYAYAHsBqasReVcTKutNjlz3nPrbT1EtLKssEjI69iP8Ab8j8ampo4qFaK8hE6I5foXYjqXo66eQ/JTun6rn8Aa6WVa5C89FHMR2ejmWUHnH2Eh11" +
+  "NTSHpU6yuri7U0ByPuZhszdfostzYn+H6OUn/bGiS2CsgRHazS0isc+dcpUo4cZ98nqPcdj76mppQpXOspPH2Y6QB6E5K6+UVJGY/PS6TAgrDEjRUcf69nkPt2Uflh3Xrjc6u7VP1FZMZHwFUYAVFHZVUcKo9gABqamqUQKMCZ9lr2HLnM5dTU1NHFz/2Q==";
+const BLUE_TOKEN = "data:image/jpeg;base64," + BLUE_TOKEN_B64;
+const RED_TOKEN = "data:image/jpeg;base64," + RED_TOKEN_B64;
 
 const DEMO_LEDGER = {
   campaign: "Ghosts in Hyperspace",
@@ -213,6 +268,39 @@ function PipRow({ current, threshold, colorClass, size = "normal" }) {
   );
 }
 
+// One-shot directional highlight: sweeps bottom-to-top in `color` on an
+// increase, top-to-bottom in green on a decrease. Renders nothing when idle.
+function SweepOverlay({ active, dir, color }) {
+  if (!active) return null;
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none"
+      style={{
+        background: dir === "down" ? "#6fae6066" : `${color}66`,
+        animation: `${dir === "down" ? "sweepDown" : "sweepUp"} 0.9s ease-out 1`,
+      }}
+    />
+  );
+}
+
+function DestinyTokens({ count, src, alt, sweepActive, sweepDir, sweepColor }) {
+  return (
+    <div className="relative flex gap-1">
+      <div className="flex gap-1">
+        {Array.from({ length: count }, (_, i) => (
+          <img
+            key={i}
+            src={src}
+            alt={alt}
+            style={{ width: 33, height: 33, display: "block", filter: "drop-shadow(0 0 3px rgba(0,0,0,0.5))" }}
+          />
+        ))}
+      </div>
+      <SweepOverlay active={sweepActive} dir={sweepDir} color={sweepColor} />
+    </div>
+  );
+}
+
 function SkillPips({ rank, characteristic, boost = 0 }) {
   const total = Math.max(rank, characteristic);
   const yellow = Math.min(rank, characteristic);
@@ -316,6 +404,17 @@ export default function CampaignDashboard() {
   const liveTimer = useRef(null);
   const countdownTimer = useRef(null);
 
+  // Tracks when each live value last changed (and which direction), purely
+  // to drive the one-shot sweep highlight — never affects displayed values.
+  const lastChangeRef = useRef({ wounds: {}, strain: {}, woundsDir: {}, strainDir: {}, destinyLightTs: 0, destinyLightDir: null, destinyDarkTs: 0, destinyDarkDir: null });
+  const ledgerRef = useRef(ledger);
+  useEffect(() => { ledgerRef.current = ledger; }, [ledger]);
+  const [, forceTick] = useState(0);
+  const scheduleSweepClear = () => {
+    setTimeout(() => forceTick((t) => t + 1), SWEEP_MS + 100);
+    setTimeout(() => forceTick((t) => t + 1), PULSE_MS + 100);
+  };
+
   useEffect(() => {
     bootTimer.current = setTimeout(() => setBooted(true), 650);
     fetch("/data/ledger.json")
@@ -346,7 +445,42 @@ export default function CampaignDashboard() {
       if (!res.ok) throw new Error(`${res.status}`);
       const text = await res.text();
       const parsed = JSON.parse(text);
-      setLive({ status: "ok", ...parsed, fetchedAt: new Date() });
+
+      setLive((prev) => {
+        const now = Date.now();
+        const lc = lastChangeRef.current;
+        const party = ledgerRef.current.characters || [];
+        const prevForOverlay = prev.status === "ok" ? prev : { status: "idle" };
+
+        party.filter((p) => p.liveId).forEach((p) => {
+          const oldOverlay = applyLiveOverlay(p, prevForOverlay);
+          const newWounds = parsed.wounds && parsed.wounds[p.liveId] != null ? parsed.wounds[p.liveId] : oldOverlay.wounds.current;
+          const newStrain = parsed.strain && parsed.strain[p.liveId] != null ? parsed.strain[p.liveId] : oldOverlay.strain.current;
+          if (newWounds !== oldOverlay.wounds.current) {
+            lc.wounds[p.liveId] = now;
+            lc.woundsDir[p.liveId] = newWounds > oldOverlay.wounds.current ? "up" : "down";
+          }
+          if (newStrain !== oldOverlay.strain.current) {
+            lc.strain[p.liveId] = now;
+            lc.strainDir[p.liveId] = newStrain > oldOverlay.strain.current ? "up" : "down";
+          }
+        });
+
+        const oldDestiny = prevForOverlay.destiny || party[0]?.destiny || { light: 0, dark: 0 };
+        if (parsed.destiny) {
+          if (parsed.destiny.light !== oldDestiny.light) {
+            lc.destinyLightTs = now;
+            lc.destinyLightDir = parsed.destiny.light > oldDestiny.light ? "up" : "down";
+          }
+          if (parsed.destiny.dark !== oldDestiny.dark) {
+            lc.destinyDarkTs = now;
+            lc.destinyDarkDir = parsed.destiny.dark > oldDestiny.dark ? "up" : "down";
+          }
+        }
+
+        scheduleSweepClear();
+        return { status: "ok", ...parsed, fetchedAt: new Date() };
+      });
     } catch (err) {
       setLive((prev) => ({ ...prev, status: "error", errorMsg: err.message }));
     }
@@ -419,12 +553,19 @@ export default function CampaignDashboard() {
   ];
 
   const partySkillSets = party.map((p) => buildSkills(p));
-  const partySkillNames = FULL_SKILL_LIST.filter((canon) =>
-    partySkillSets.some((set) => (set.find((s) => s.name === canon.name)?.rank ?? 0) > 0)
-  );
+  const partySkillNames = FULL_SKILL_LIST;
   const partyOverlays = party.map((p) => applyLiveOverlay(p, live));
   const partyDestiny = partyOverlays.find((o) => o.destinyLive)?.destiny || party[0]?.destiny || { light: 0, dark: 0 };
   const anyLive = live.status === "ok";
+
+  const now = Date.now();
+  const lc = lastChangeRef.current;
+  const woundsSweepOn = !!active.liveId && (now - (lc.wounds[active.liveId] || 0)) < SWEEP_MS;
+  const woundsDir = lc.woundsDir[active.liveId];
+  const strainSweepOn = !!active.liveId && (now - (lc.strain[active.liveId] || 0)) < SWEEP_MS;
+  const strainDir = lc.strainDir[active.liveId];
+  const destinyLightSweepOn = (now - (lc.destinyLightTs || 0)) < SWEEP_MS;
+  const destinyDarkSweepOn = (now - (lc.destinyDarkTs || 0)) < SWEEP_MS;
 
   return (
     <div
@@ -436,6 +577,8 @@ export default function CampaignDashboard() {
         @keyframes scan { 0% { transform: translateY(-100%); opacity: 0.9; } 100% { transform: translateY(2200%); opacity: 0; } }
         @keyframes flicker { 0%,100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: 0.4; } 94% { opacity: 1; } }
         @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+        @keyframes sweepUp { 0% { clip-path: inset(100% 0 0 0); opacity: 1; } 55% { clip-path: inset(0 0 0 0); opacity: 1; } 100% { clip-path: inset(0 0 0 0); opacity: 0; } }
+        @keyframes sweepDown { 0% { clip-path: inset(0 0 100% 0); opacity: 1; } 55% { clip-path: inset(0 0 0 0); opacity: 1; } 100% { clip-path: inset(0 0 0 0); opacity: 0; } }
         .boot-scan { position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, #5ec8d8, transparent); animation: scan 0.65s ease-out forwards; pointer-events: none; }
         .flicker-in { animation: flicker 1.4s ease-out; }
         .mono-num { font-variant-numeric: tabular-nums; }
@@ -527,7 +670,7 @@ export default function CampaignDashboard() {
               className="mt-2 text-[11px] tracking-wide uppercase px-3 py-1.5"
               style={{ background: "#ffb000", color: "#101315", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}
             >
-              Parse & load
+              Parse &amp; load
             </button>
             {loadState.msg && (
               <p className="mt-2 text-[12px]" style={{ color: loadState.status === "error" ? "#c23b3b" : "#5ec8d8" }}>
@@ -555,11 +698,11 @@ export default function CampaignDashboard() {
                   )}
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <PipRow current={partyDestiny.light} threshold={partyDestiny.light} colorClass="#8fd3f4" />
+                  <DestinyTokens count={partyDestiny.light} src={BLUE_TOKEN} alt="Light Side Destiny Point" sweepActive={destinyLightSweepOn} sweepDir={lc.destinyLightDir} sweepColor="#8fd3f4" />
                   <span className="text-[11px]" style={{ color: "#8a8f93" }}>light</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <PipRow current={partyDestiny.dark} threshold={partyDestiny.dark} colorClass="#c23b3b" />
+                  <DestinyTokens count={partyDestiny.dark} src={RED_TOKEN} alt="Dark Side Destiny Point" sweepActive={destinyDarkSweepOn} sweepDir={lc.destinyDarkDir} sweepColor="#c23b3b" />
                   <span className="text-[11px]" style={{ color: "#8a8f93" }}>dark</span>
                 </div>
               </div>
@@ -589,19 +732,29 @@ export default function CampaignDashboard() {
                   <tbody>
                     <tr>
                       <td className="pt-2 pb-1 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>Wounds</td>
-                      {partyOverlays.map((o, i) => (
-                        <td key={i} className="pt-2 pb-1 px-2 mono-num text-[14px]" style={{ color: severityColor(o.wounds.current, o.wounds.threshold) }}>
-                          {o.wounds.current} / {o.wounds.threshold}{o.woundsLive && <span className="ml-1" style={{ color: "#6fae60" }}>●</span>}
-                        </td>
-                      ))}
+                      {partyOverlays.map((o, i) => {
+                        const liveId = party[i]?.liveId;
+                        const sweepOn = !!liveId && (now - (lc.wounds[liveId] || 0)) < SWEEP_MS;
+                        return (
+                          <td key={i} className="relative pt-2 pb-1 px-2 mono-num text-[14px]" style={{ color: severityColor(o.wounds.current, o.wounds.threshold) }}>
+                            {o.wounds.current} / {o.wounds.threshold}{o.woundsLive && <span className="ml-1" style={{ color: "#6fae60" }}>●</span>}
+                            <SweepOverlay active={sweepOn} dir={lc.woundsDir[liveId]} color="#c23b3b" />
+                          </td>
+                        );
+                      })}
                     </tr>
                     <tr>
                       <td className="py-1 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>Strain</td>
-                      {partyOverlays.map((o, i) => (
-                        <td key={i} className="py-1 px-2 mono-num text-[14px]" style={{ color: severityColor(o.strain.current, o.strain.threshold) }}>
-                          {o.strain.current} / {o.strain.threshold}{o.strainLive && <span className="ml-1" style={{ color: "#6fae60" }}>●</span>}
-                        </td>
-                      ))}
+                      {partyOverlays.map((o, i) => {
+                        const liveId = party[i]?.liveId;
+                        const sweepOn = !!liveId && (now - (lc.strain[liveId] || 0)) < SWEEP_MS;
+                        return (
+                          <td key={i} className="relative py-1 px-2 mono-num text-[14px]" style={{ color: severityColor(o.strain.current, o.strain.threshold) }}>
+                            {o.strain.current} / {o.strain.threshold}{o.strainLive && <span className="ml-1" style={{ color: "#6fae60" }}>●</span>}
+                            <SweepOverlay active={sweepOn} dir={lc.strainDir[liveId]} color="#ffb000" />
+                          </td>
+                        );
+                      })}
                     </tr>
                     <tr>
                       <td className="py-1 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>Soak</td>
@@ -725,10 +878,16 @@ export default function CampaignDashboard() {
                 <div className="grid sm:grid-cols-2 gap-x-8">
                   <div>
                     <Stat label={`Wounds — ${wounds.current} / ${wounds.threshold}`} live={overlay.woundsLive}>
-                      <PipRow current={wounds.current} threshold={wounds.threshold} colorClass="#c23b3b" />
+                      <div className="relative">
+                        <PipRow current={wounds.current} threshold={wounds.threshold} colorClass="#c23b3b" />
+                        <SweepOverlay active={woundsSweepOn} dir={woundsDir} color="#c23b3b" />
+                      </div>
                     </Stat>
                     <Stat label={`Strain — ${strain.current} / ${strain.threshold}`} live={overlay.strainLive}>
-                      <PipRow current={strain.current} threshold={strain.threshold} colorClass="#ffb000" />
+                      <div className="relative">
+                        <PipRow current={strain.current} threshold={strain.threshold} colorClass="#ffb000" />
+                        <SweepOverlay active={strainSweepOn} dir={strainDir} color="#ffb000" />
+                      </div>
                     </Stat>
                     <Stat label="Soak">
                       <span className="text-xl mono-num" style={{ color: "#e7e2d2" }}>{v.soak ?? "—"}</span>
@@ -738,11 +897,11 @@ export default function CampaignDashboard() {
                     <Stat label="Destiny Pool (party)" live={overlay.destinyLive}>
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1.5">
-                          <PipRow current={destiny.light} threshold={destiny.light} colorClass="#8fd3f4" size="small" />
+                          <DestinyTokens count={destiny.light} src={BLUE_TOKEN} alt="Light Side Destiny Point" sweepActive={destinyLightSweepOn} sweepDir={lc.destinyLightDir} sweepColor="#8fd3f4" />
                           <span className="text-[11px]" style={{ color: "#8a8f93" }}>light</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <PipRow current={destiny.dark} threshold={destiny.dark} colorClass="#c23b3b" size="small" />
+                          <DestinyTokens count={destiny.dark} src={RED_TOKEN} alt="Dark Side Destiny Point" sweepActive={destinyDarkSweepOn} sweepDir={lc.destinyDarkDir} sweepColor="#c23b3b" />
                           <span className="text-[11px]" style={{ color: "#8a8f93" }}>dark</span>
                         </div>
                       </div>
