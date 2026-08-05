@@ -261,16 +261,16 @@ function getDefense(character) {
 // Custom blank die-face artwork (Cameron's own designs) — one PNG per die
 // type, dropped in public/images/ with these filenames.
 const DIE_TYPES = [
-  { key: "proficiency", label: "Proficiency", sides: 12, img: "/images/die-proficiency.png",
-    faces: { 1: [], 2: ["tr"], 3: ["s"], 4: ["s"], 5: ["a"], 6: ["s", "a"], 7: ["s", "a"], 8: ["s", "a"], 9: ["s", "s"], 10: ["s", "s"], 11: ["a", "a"], 12: ["a", "a"] } },
   { key: "ability", label: "Ability", sides: 8, img: "/images/die-ability.png",
     faces: { 1: [], 2: ["s"], 3: ["s"], 4: ["a"], 5: ["a"], 6: ["s", "a"], 7: ["a", "a"], 8: ["s", "s"] } },
+  { key: "proficiency", label: "Proficiency", sides: 12, img: "/images/die-proficiency.png",
+    faces: { 1: [], 2: ["tr"], 3: ["s"], 4: ["s"], 5: ["a"], 6: ["s", "a"], 7: ["s", "a"], 8: ["s", "a"], 9: ["s", "s"], 10: ["s", "s"], 11: ["a", "a"], 12: ["a", "a"] } },
   { key: "boost", label: "Boost", sides: 6, img: "/images/die-boost.png",
     faces: { 1: [], 2: [], 3: ["s"], 4: ["a"], 5: ["a", "a"], 6: ["s", "a"] } },
-  { key: "challenge", label: "Challenge", sides: 12, img: "/images/die-challenge.png",
-    faces: { 1: [], 2: ["d"], 3: ["f"], 4: ["f"], 5: ["t"], 6: ["t"], 7: ["f", "f"], 8: ["f", "f"], 9: ["t", "t"], 10: ["t", "t"], 11: ["t", "f"], 12: ["t", "f"] } },
   { key: "difficulty", label: "Difficulty", sides: 8, img: "/images/die-difficulty.png",
     faces: { 1: [], 2: ["f"], 3: ["t"], 4: ["t"], 5: ["t"], 6: ["f", "f"], 7: ["f", "t"], 8: ["t", "t"] } },
+  { key: "challenge", label: "Challenge", sides: 12, img: "/images/die-challenge.png",
+    faces: { 1: [], 2: ["d"], 3: ["f"], 4: ["f"], 5: ["t"], 6: ["t"], 7: ["f", "f"], 8: ["f", "f"], 9: ["t", "t"], 10: ["t", "t"], 11: ["t", "f"], 12: ["t", "f"] } },
   { key: "setback", label: "Setback", sides: 6, img: "/images/die-setback.png",
     faces: { 1: [], 2: [], 3: ["f"], 4: ["f"], 5: ["t"], 6: ["t"] } },
   { key: "force", label: "Force", sides: 12, img: "/images/die-force.png",
@@ -383,6 +383,26 @@ function poolLabel(pool) {
   return parts.length ? parts.join(", ") : "No dice selected";
 }
 
+// Icon + description readout of the current pool — sits next to Roll/Clear
+// pool so players can see exactly what's selected without reading a plain
+// count string.
+function SelectedDiceSummary({ pool, size = 18 }) {
+  const active = DIE_TYPES.filter((dt) => (pool[dt.key] || 0) > 0);
+  if (active.length === 0) {
+    return <span className="text-[12px]" style={{ color: "#5a5f62" }}>No dice selected</span>;
+  }
+  return (
+    <span className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+      {active.map((dt) => (
+        <span key={dt.key} className="flex items-center gap-1.5 text-[12px]" style={{ color: "#e7e2d2" }}>
+          <DieFaceIcon img={dt.img} label={dt.label} size={size} />
+          {pool[dt.key]} {dt.label}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 // Difficulty tier readout: Challenge dice count toward the same tier as
 // Difficulty dice (both represent the check's base difficulty — Challenge
 // is just Difficulty "upgraded" per FFG's dice-upgrade rule), so the tier
@@ -474,6 +494,26 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
     setPool((p) => ({ ...p, [key]: value }));
   }
 
+  function setDifficulty(count) {
+    setPool((p) => ({ ...p, difficulty: count }));
+  }
+
+  // FFG "upgrade" rule: converts one Ability die into a Proficiency die.
+  function upgradeAbilityToProficiency() {
+    setPool((p) => {
+      if ((p.ability || 0) <= 0) return p;
+      return { ...p, ability: p.ability - 1, proficiency: (p.proficiency || 0) + 1 };
+    });
+  }
+
+  // FFG "upgrade" rule: converts one Difficulty die into a Challenge die.
+  function upgradeDifficultyToChallenge() {
+    setPool((p) => {
+      if ((p.difficulty || 0) <= 0) return p;
+      return { ...p, difficulty: p.difficulty - 1, challenge: (p.challenge || 0) + 1 };
+    });
+  }
+
   async function handleRoll() {
     const result = rollPool(pool);
     setLastResult(result);
@@ -551,22 +591,74 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
           <DiceCounter dieType={forceDie} count={pool.force} onChange={(v) => updateDie("force", v)} />
         </div>
 
-        <div className="flex items-center gap-2 mb-5 flex-wrap">
-          <button
-            onClick={handleRoll}
-            className="text-[12px] tracking-[0.15em] uppercase px-5 py-2"
-            style={{ background: "#ffb000", color: "#101315", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}
-          >
-            Roll
-          </button>
-          <button
-            onClick={() => { setPool(EMPTY_POOL); setLoadedLabel(null); }}
-            className="text-[11px] tracking-[0.15em] uppercase px-4 py-2 border"
-            style={{ color: "#8a8f93", borderColor: "#3a3f42" }}
-          >
-            Clear pool
-          </button>
-          <span className="text-[12px]" style={{ color: "#5a5f62" }}>{poolLabel(pool)}</span>
+        <div className="mb-3">
+          <div className="text-[10px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#5a5f62" }}>Quick difficulty</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {[2, 3, 4].map((n) => (
+              <button
+                key={n}
+                onClick={() => setDifficulty(n)}
+                className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors"
+                style={{ color: "#8a5ec8", borderColor: "#8a5ec866" }}
+              >
+                {n} · {DIFFICULTY_TIER_NAMES[n]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-5">
+          <div className="text-[10px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#5a5f62" }}>Upgrade dice</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={upgradeAbilityToProficiency}
+              disabled={(pool.ability || 0) <= 0}
+              className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5"
+              style={{
+                background: "linear-gradient(90deg, #6fae60 0%, #6fae60 50%, #e8c547 50%, #e8c547 100%)",
+                color: "#101315",
+                opacity: (pool.ability || 0) <= 0 ? 0.4 : 1,
+                cursor: (pool.ability || 0) <= 0 ? "not-allowed" : "pointer",
+                fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
+              }}
+            >
+              Ability → Proficiency
+            </button>
+            <button
+              onClick={upgradeDifficultyToChallenge}
+              disabled={(pool.difficulty || 0) <= 0}
+              className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5"
+              style={{
+                background: "linear-gradient(90deg, #8a5ec8 0%, #8a5ec8 50%, #c23b3b 50%, #c23b3b 100%)",
+                color: "#f5f5f0",
+                opacity: (pool.difficulty || 0) <= 0 ? 0.4 : 1,
+                cursor: (pool.difficulty || 0) <= 0 ? "not-allowed" : "pointer",
+                fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
+              }}
+            >
+              Difficulty → Challenge
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-4 mb-5 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleRoll}
+              className="text-[12px] tracking-[0.15em] uppercase px-5 py-2"
+              style={{ background: "#ffb000", color: "#101315", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}
+            >
+              Roll
+            </button>
+            <button
+              onClick={() => { setPool(EMPTY_POOL); setLoadedLabel(null); }}
+              className="text-[11px] tracking-[0.15em] uppercase px-4 py-2 border"
+              style={{ color: "#8a8f93", borderColor: "#3a3f42" }}
+            >
+              Clear pool
+            </button>
+          </div>
+          <SelectedDiceSummary pool={pool} />
         </div>
 
         {loadedLabel && (
