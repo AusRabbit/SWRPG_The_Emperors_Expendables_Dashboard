@@ -34,53 +34,13 @@ const LIVE_POLL_MS = 10_000;
 const SWEEP_MS = 950;
 const PULSE_MS = 2400;
 
-const BLUE_TOKEN_B64 =
-  "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" +
-  "TRo0aM2f/9k=";
-const RED_TOKEN_B64 =
-  "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" +
-  "Sq9KgwxsCekZBOWK5J0WCd4AZV2OcyvIPCu+Qin+ulgoameRR9E4Z6iOMjPWyLwp7AIxBOecY17v9Dt28Xult22KX+w26Py6iueQt9bIOWc89PSOeQACM+3SB233cdbu/wA2itFC1rtrZM8kkmaipBJyZXPCg5+3tzgltD4HoLRZ3ldP+nKxQMhKvcHH8EeeRH/M/wAc" +
-  "dyF0BJbpXeUIgT8l2w7eYP3VLBHa4EaMmeqdZqfJIMVMoZQcY58xiT+BEDj1A6mluvrp7lWS1dSwaWU5OBgD2AAHYAYAHsBqasReVcTKutNjlz3nPrbT1EtLKssEjI69iP8Ab8j8ampo4qFaK8hE6I5foXYjqXo66eQ/JTun6rn8Aa6WVa5C89FHMR2ejmWUHnH2Eh11" +
-  "NTSHpU6yuri7U0ByPuZhszdfostzYn+H6OUn/bGiS2CsgRHazS0isc+dcpUo4cZ98nqPcdj76mppQpXOspPH2Y6QB6E5K6+UVJGY/PS6TAgrDEjRUcf69nkPt2Uflh3Xrjc6u7VP1FZMZHwFUYAVFHZVUcKo9gABqamqUQKMCZ9lr2HLnM5dTU1NHFz/2Q==";
-const BLUE_TOKEN = "data:image/jpeg;base64," + BLUE_TOKEN_B64;
-const RED_TOKEN = "data:image/jpeg;base64," + RED_TOKEN_B64;
+const BLUE_TOKEN = "/images/blue-token.png";
+const RED_TOKEN = "/images/red-token.png";
+
+const BOOST_ICON = "/images/boost-icon.png";
+
+const YELLOW_ICON = "/images/yellow-icon.png";
+const GREEN_ICON = "/images/green-icon.png";
 
 const DEMO_LEDGER = {
   campaign: "Ghosts in Hyperspace",
@@ -809,25 +769,24 @@ function SkillPips({ rank, characteristic, boost = 0 }) {
       ) : (
         <span className="flex gap-1">
           {Array.from({ length: total }, (_, i) => (
-            <span
+            <img
               key={i}
-              className="w-2.5 h-2.5 border"
-              style={{
-                borderColor: i < yellow ? "#f5c518" : "#6fae60",
-                background: i < yellow ? "#f5c518" : "#6fae60",
-                boxShadow: i < yellow ? "0 0 4px #f5c51899" : "0 0 4px #6fae6099",
-              }}
+              src={i < yellow ? YELLOW_ICON : GREEN_ICON}
+              alt={i < yellow ? "Proficiency die" : "Ability die"}
+              className="w-2.5 h-2.5"
+              style={{ display: "block" }}
             />
           ))}
         </span>
       )}
       {boost > 0 && (
         <span
-          className="text-[10px] leading-none"
+          className="text-[10px] leading-none inline-flex items-center gap-0.5"
           style={{ color: "#5ec8d8" }}
           title={`+${boost} Boost die from talents`}
         >
-          ▲{boost > 1 ? `×${boost}` : ""}
+          <img src={BOOST_ICON} alt="Boost" style={{ width: 10, height: 10, display: "inline-block" }} />
+          {boost > 1 ? `×${boost}` : ""}
         </span>
       )}
     </span>
@@ -1247,12 +1206,12 @@ export default function CampaignDashboard() {
 
               <div className="flex items-center gap-4 mb-4 text-[11px]" style={{ color: "#8a8f93" }}>
                 <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 inline-block" style={{ background: "#f5c518" }} /> proficiency dice
+                  <img src={YELLOW_ICON} alt="Proficiency die" className="w-2.5 h-2.5 inline-block" /> proficiency dice
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 inline-block" style={{ background: "#6fae60" }} /> ability dice
+                  <img src={GREEN_ICON} alt="Ability die" className="w-2.5 h-2.5 inline-block" /> ability dice
                 </span>
-                <span className="flex items-center gap-1" style={{ color: "#5ec8d8" }}>▲ talent boost die</span>
+                <span className="flex items-center gap-1" style={{ color: "#5ec8d8" }}><img src={BOOST_ICON} alt="Boost" style={{ width: 12, height: 12, display: "inline-block" }} /> talent boost die</span>
               </div>
 
               <div className="overflow-x-auto">
@@ -1520,13 +1479,13 @@ export default function CampaignDashboard() {
                     <div className="text-[11px] tracking-[0.2em] uppercase" style={{ color: "#8a8f93" }}>Skills</div>
                     <div className="text-[11px] flex items-center gap-3">
                       <span className="flex items-center gap-1" style={{ color: "#8a8f93" }}>
-                        <span className="w-2.5 h-2.5 inline-block" style={{ background: "#f5c518" }} /> proficiency
+                        <img src={YELLOW_ICON} alt="Proficiency die" className="w-2.5 h-2.5 inline-block" /> proficiency
                       </span>
                       <span className="flex items-center gap-1" style={{ color: "#8a8f93" }}>
-                        <span className="w-2.5 h-2.5 inline-block" style={{ background: "#6fae60" }} /> ability
+                        <img src={GREEN_ICON} alt="Ability die" className="w-2.5 h-2.5 inline-block" /> ability
                       </span>
                       <span style={{ color: "#5ec8d8" }}>career skill</span>
-                      <span style={{ color: "#5ec8d8" }}>▲ talent boost</span>
+                      <span className="inline-flex items-center gap-1" style={{ color: "#5ec8d8" }}><img src={BOOST_ICON} alt="Boost" style={{ width: 12, height: 12, display: "inline-block" }} /> talent boost</span>
                     </div>
                   </div>
                   {["General", "Combat", "Knowledge"].map((group) => (
