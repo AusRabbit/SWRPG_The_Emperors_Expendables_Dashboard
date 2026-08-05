@@ -343,6 +343,25 @@ function poolLabel(pool) {
   return parts.length ? parts.join(", ") : "No dice selected";
 }
 
+// Custom "new roll landed in the shared log" sound — Cameron's own uploaded
+// clips (a set of saber-strike variants), one picked at random each time so
+// a busy table doesn't hear the identical clip back-to-back.
+const ROLL_SOUNDS = [
+  "/sounds/dice-roll-a.wav",
+  "/sounds/dice-roll-b.wav",
+  "/sounds/dice-roll-c.wav",
+  "/sounds/dice-roll-d.wav",
+  "/sounds/dice-roll-e.wav",
+  "/sounds/dice-roll-f.wav",
+];
+
+function playRandomRollSound() {
+  const src = ROLL_SOUNDS[Math.floor(Math.random() * ROLL_SOUNDS.length)];
+  const audio = new Audio(src);
+  audio.volume = 0.1;
+  audio.play().catch(() => { /* blocked until a user gesture unlocks audio — see handleRoll */ });
+}
+
 // Icon + description readout of the current pool — sits next to Roll/Clear
 // pool so players can see exactly what's selected without reading a plain
 // count string.
@@ -418,12 +437,33 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
   const [logStatus, setLogStatus] = useState({ status: "idle" });
   const pollRef = useRef(null);
 
+  // Chime on new shared-log entries. soundOn is mirrored into a ref because
+  // fetchLog's setInterval closure is created once on mount and would
+  // otherwise only ever see the initial value of the state variable.
+  const [soundOn, setSoundOn] = useState(() => {
+    try { return localStorage.getItem("swrpg-dice-sound") !== "off"; } catch { return true; }
+  });
+  const soundOnRef = useRef(soundOn);
+  useEffect(() => {
+    soundOnRef.current = soundOn;
+    try { localStorage.setItem("swrpg-dice-sound", soundOn ? "on" : "off"); } catch { /* ignore */ }
+  }, [soundOn]);
+  const hasFetchedRef = useRef(false);
+  const prevTopIdRef = useRef(undefined);
+
   const fetchLog = async () => {
     try {
       const res = await fetch(`/rolls?_=${Date.now()}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`${res.status}`);
       const data = await res.json();
-      setLog(Array.isArray(data.rolls) ? data.rolls : []);
+      const rolls = Array.isArray(data.rolls) ? data.rolls : [];
+      const newestId = rolls[0]?.id;
+      if (hasFetchedRef.current && newestId && newestId !== prevTopIdRef.current && soundOnRef.current) {
+        playRandomRollSound();
+      }
+      hasFetchedRef.current = true;
+      prevTopIdRef.current = newestId;
+      setLog(rolls);
       setLogStatus({ status: "ok" });
     } catch (err) {
       setLogStatus({ status: "error", msg: err.message });
@@ -475,6 +515,15 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
   }
 
   async function handleRoll() {
+    // Clicking Roll is a user gesture, so use it to "unlock" playback —
+    // browsers block audio.play() until one has occurred on the page. Play
+    // silently and immediately pause so a viewer who only ever clicks Roll
+    // (never anything else) still gets sound for everyone else's rolls too.
+    try {
+      const primer = new Audio(ROLL_SOUNDS[0]);
+      primer.volume = 0;
+      primer.play().then(() => primer.pause()).catch(() => {});
+    } catch { /* ignore */ }
     const result = rollPool(pool);
     setLastResult(result);
     const entry = {
@@ -656,6 +705,14 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
               {logStatus.status === "error" && (
                 <span className="text-[11px]" style={{ color: "#c23b3b" }}>{logStatus.msg}</span>
               )}
+              <button
+                onClick={() => setSoundOn((s) => !s)}
+                className="text-[11px] tracking-[0.15em] uppercase px-3 py-1 border transition-colors"
+                style={{ color: soundOn ? "#5ec8d8" : "#5a5f62", borderColor: soundOn ? "#5ec8d866" : "#3a3f42" }}
+                title={soundOn ? "Mute sound on new rolls" : "Unmute sound on new rolls"}
+              >
+                {soundOn ? "🔔 Sound on" : "🔕 Muted"}
+              </button>
               {log.length > 0 && (
                 <button
                   onClick={handleClearLog}
