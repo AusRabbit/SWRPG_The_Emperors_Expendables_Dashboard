@@ -248,6 +248,412 @@ function getDefense(character) {
   return { ranged, melee };
 }
 
+// ---------------------------------------------------------------------------
+// Shared dice roller — exact FFG face tables (see FFG Dice Tables reference
+// in the GM project knowledge). Rolls are computed client-side with
+// Math.random(), never fudged or approximated. Results are posted to a small
+// shared log (Cloudflare Worker /rolls route, backed by a KV namespace) that
+// every viewer of this dashboard polls, so a roll one player makes shows up
+// for everyone within a couple seconds. This log is entirely separate from
+// the campaign ledger/live overlay above — it never reads or writes Wounds,
+// Strain, Destiny, or any character-sheet field.
+// ---------------------------------------------------------------------------
+// Custom blank die-face artwork (Cameron's own designs) — one PNG per die
+// type, dropped in public/images/ with these filenames.
+const DIE_TYPES = [
+  { key: "proficiency", label: "Proficiency", sides: 12, img: "/images/die-proficiency.png",
+    faces: { 1: [], 2: ["tr"], 3: ["s"], 4: ["s"], 5: ["a"], 6: ["s", "a"], 7: ["s", "a"], 8: ["s", "a"], 9: ["s", "s"], 10: ["s", "s"], 11: ["a", "a"], 12: ["a", "a"] } },
+  { key: "ability", label: "Ability", sides: 8, img: "/images/die-ability.png",
+    faces: { 1: [], 2: ["s"], 3: ["s"], 4: ["a"], 5: ["a"], 6: ["s", "a"], 7: ["a", "a"], 8: ["s", "s"] } },
+  { key: "boost", label: "Boost", sides: 6, img: "/images/die-boost.png",
+    faces: { 1: [], 2: [], 3: ["s"], 4: ["a"], 5: ["a", "a"], 6: ["s", "a"] } },
+  { key: "challenge", label: "Challenge", sides: 12, img: "/images/die-challenge.png",
+    faces: { 1: [], 2: ["d"], 3: ["f"], 4: ["f"], 5: ["t"], 6: ["t"], 7: ["f", "f"], 8: ["f", "f"], 9: ["t", "t"], 10: ["t", "t"], 11: ["t", "f"], 12: ["t", "f"] } },
+  { key: "difficulty", label: "Difficulty", sides: 8, img: "/images/die-difficulty.png",
+    faces: { 1: [], 2: ["f"], 3: ["t"], 4: ["t"], 5: ["t"], 6: ["f", "f"], 7: ["f", "t"], 8: ["t", "t"] } },
+  { key: "setback", label: "Setback", sides: 6, img: "/images/die-setback.png",
+    faces: { 1: [], 2: [], 3: ["f"], 4: ["f"], 5: ["t"], 6: ["t"] } },
+  { key: "force", label: "Force", sides: 12, img: "/images/die-force.png",
+    faces: { 1: ["lp"], 2: ["lp"], 3: ["lp", "lp"], 4: ["lp", "lp"], 5: ["lp", "lp"], 6: ["dp"], 7: ["dp"], 8: ["dp"], 9: ["dp"], 10: ["dp"], 11: ["dp"], 12: ["dp", "dp"] } },
+];
+
+function DieFaceIcon({ img, label, size = 20 }) {
+  return (
+    <img
+      src={img}
+      alt={label}
+      title={label}
+      style={{ width: size, height: size, display: "block", flexShrink: 0, objectFit: "contain" }}
+    />
+  );
+}
+
+// Custom symbol artwork (Cameron's own designs) — one PNG per FFG dice
+// symbol, dropped in public/images/ with these filenames.
+const SYMBOL_META = {
+  s: { label: "Success", img: "/images/symbol-success.png" },
+  f: { label: "Failure", img: "/images/symbol-failure.png" },
+  a: { label: "Advantage", img: "/images/symbol-advantage.png" },
+  t: { label: "Threat", img: "/images/symbol-threat.png" },
+  tr: { label: "Triumph", img: "/images/symbol-triumph.png" },
+  d: { label: "Despair", img: "/images/symbol-despair.png" },
+  lp: { label: "Light Side Point", img: "/images/symbol-light-side.png" },
+  dp: { label: "Dark Side Point", img: "/images/symbol-dark-side.png" },
+};
+
+function SymbolIcon({ sym, size = 16 }) {
+  const meta = SYMBOL_META[sym];
+  if (!meta) return null;
+  return (
+    <img
+      src={meta.img}
+      alt={meta.label}
+      title={meta.label}
+      style={{ width: size, height: size, display: "inline-block", verticalAlign: "middle" }}
+    />
+  );
+}
+
+// "N <icon>" for a symbol tally — renders nothing if count is 0/falsy.
+function SymbolTally({ sym, count, size = 15, withLabel = false, fontSize }) {
+  if (!count) return null;
+  const meta = SYMBOL_META[sym];
+  return (
+    <span className="inline-flex items-center gap-2 mono-num" style={fontSize ? { fontSize } : undefined}>
+      {count}
+      <SymbolIcon sym={sym} size={size} />
+      {withLabel && meta && <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 600 }}>{meta.label}</span>}
+    </span>
+  );
+}
+
+function NetResultSummary({ result, size = 17 }) {
+  return (
+    <span className="flex flex-wrap items-center gap-3">
+      {result.netSuccess !== 0 ? (
+        <SymbolTally sym={result.netSuccess > 0 ? "s" : "f"} count={Math.abs(result.netSuccess)} size={size} />
+      ) : (
+        <span className="text-[13px]">0 net Success/Failure</span>
+      )}
+      {result.netAdvantage !== 0 && (
+        <SymbolTally sym={result.netAdvantage > 0 ? "a" : "t"} count={Math.abs(result.netAdvantage)} size={size} />
+      )}
+      {result.triumph > 0 && <SymbolTally sym="tr" count={result.triumph} size={size} />}
+      {result.despair > 0 && <SymbolTally sym="d" count={result.despair} size={size} />}
+      {result.lightPoint > 0 && <SymbolTally sym="lp" count={result.lightPoint} size={size} />}
+      {result.darkPoint > 0 && <SymbolTally sym="dp" count={result.darkPoint} size={size} />}
+    </span>
+  );
+}
+
+function rollDie(dieType) {
+  const face = Math.floor(Math.random() * dieType.sides) + 1;
+  return { face, symbols: dieType.faces[face] || [] };
+}
+
+function rollPool(pool) {
+  const rolls = [];
+  DIE_TYPES.forEach((dt) => {
+    const count = pool[dt.key] || 0;
+    for (let i = 0; i < count; i++) {
+      const r = rollDie(dt);
+      rolls.push({ die: dt.key, label: dt.label, img: dt.img, face: r.face, symbols: r.symbols });
+    }
+  });
+
+  let success = 0, failure = 0, advantage = 0, threat = 0, triumph = 0, despair = 0, lightPoint = 0, darkPoint = 0;
+  rolls.forEach((r) => {
+    r.symbols.forEach((sym) => {
+      if (sym === "s") success += 1;
+      if (sym === "f") failure += 1;
+      if (sym === "a") advantage += 1;
+      if (sym === "t") threat += 1;
+      if (sym === "tr") { triumph += 1; success += 1; }
+      if (sym === "d") { despair += 1; failure += 1; }
+      if (sym === "lp") lightPoint += 1;
+      if (sym === "dp") darkPoint += 1;
+    });
+  });
+
+  return { rolls, netSuccess: success - failure, netAdvantage: advantage - threat, triumph, despair, lightPoint, darkPoint };
+}
+
+function poolLabel(pool) {
+  const parts = DIE_TYPES.filter((dt) => (pool[dt.key] || 0) > 0).map((dt) => `${pool[dt.key]} ${dt.label}`);
+  return parts.length ? parts.join(", ") : "No dice selected";
+}
+
+// Difficulty tier readout: Challenge dice count toward the same tier as
+// Difficulty dice (both represent the check's base difficulty — Challenge
+// is just Difficulty "upgraded" per FFG's dice-upgrade rule), so the tier
+// name is derived from Difficulty + Challenge combined, then flagged
+// "(Upgraded)" whenever any Challenge dice are in the pool.
+const DIFFICULTY_TIER_NAMES = { 1: "Easy", 2: "Average", 3: "Hard", 4: "Daunting", 5: "Formidable" };
+
+function difficultyTierLabel(pool) {
+  const difficultyCount = pool.difficulty || 0;
+  const challengeCount = pool.challenge || 0;
+  const total = difficultyCount + challengeCount;
+  if (total <= 0) return null;
+  const tierName = DIFFICULTY_TIER_NAMES[Math.min(total, 5)];
+  const upgraded = challengeCount > 0;
+  return `${total} Difficulty (${tierName})${upgraded ? " (Upgraded)" : ""}`;
+}
+
+function DiceCounter({ dieType, count, onChange }) {
+  return (
+    <div className="flex items-center justify-between border px-3 py-2" style={{ borderColor: "#2a2e31" }}>
+      <span className="flex items-center gap-2 text-[13px]" style={{ color: "#e7e2d2" }}>
+        <DieFaceIcon img={dieType.img} label={dieType.label} size={22} />
+        {dieType.label}
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onChange(Math.max(0, count - 1))}
+          className="w-6 h-6 border text-[13px] leading-none"
+          style={{ borderColor: "#3a3f42", color: "#8a8f93" }}
+        >
+          −
+        </button>
+        <span className="w-5 text-center mono-num" style={{ color: "#e7e2d2" }}>{count}</span>
+        <button
+          onClick={() => onChange(count + 1)}
+          className="w-6 h-6 border text-[13px] leading-none"
+          style={{ borderColor: "#3a3f42", color: "#8a8f93" }}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const EMPTY_POOL = { proficiency: 0, ability: 0, boost: 0, challenge: 0, difficulty: 0, setback: 0, force: 0 };
+
+function DiceRollerPanel({ playerName, setPlayerName, preset }) {
+  const [pool, setPool] = useState(() => preset?.pool || EMPTY_POOL);
+  const [loadedLabel, setLoadedLabel] = useState(preset?.label || null);
+  const [lastResult, setLastResult] = useState(null);
+  const [log, setLog] = useState([]);
+  const [logStatus, setLogStatus] = useState({ status: "idle" });
+  const pollRef = useRef(null);
+
+  const fetchLog = async () => {
+    try {
+      const res = await fetch(`/rolls?_=${Date.now()}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      setLog(Array.isArray(data.rolls) ? data.rolls : []);
+      setLogStatus({ status: "ok" });
+    } catch (err) {
+      setLogStatus({ status: "error", msg: err.message });
+    }
+  };
+
+  useEffect(() => {
+    fetchLog();
+    pollRef.current = setInterval(fetchLog, 1500);
+    return () => clearInterval(pollRef.current);
+  }, []);
+
+  // Clicking a skill's dice pips (Character Sheet tab or Party View) seeds
+  // this pool with that skill's Proficiency/Ability/talent-Boost dice —
+  // never Difficulty/Challenge/Setback/Force, since those are scene- and
+  // GM-judgment-dependent, not part of the character's fixed dice pool.
+  // Keyed on preset.nonce (not the pool object itself) so clicking the same
+  // skill twice in a row still re-applies it.
+  useEffect(() => {
+    if (preset) {
+      setPool(preset.pool);
+      setLoadedLabel(preset.label || null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset?.nonce]);
+
+  function updateDie(key, value) {
+    setPool((p) => ({ ...p, [key]: value }));
+  }
+
+  async function handleRoll() {
+    const result = rollPool(pool);
+    setLastResult(result);
+    const entry = {
+      player: (playerName || "Unnamed").slice(0, 40),
+      poolLabel: poolLabel(pool),
+      netSuccess: result.netSuccess,
+      netAdvantage: result.netAdvantage,
+      triumph: result.triumph,
+      despair: result.despair,
+    };
+    try {
+      const res = await fetch("/rolls", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(entry),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setLogStatus({ status: "error", msg: data.error || `Could not post roll (${res.status})` });
+      } else {
+        fetchLog();
+      }
+    } catch (err) {
+      setLogStatus({ status: "error", msg: err.message });
+    }
+  }
+
+  async function handleClearLog() {
+    if (!window.confirm("Clear the shared roll log for everyone? This can't be undone.")) return;
+    try {
+      const res = await fetch("/rolls", { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setLogStatus({ status: "error", msg: data.error || `Could not clear log (${res.status})` });
+        return;
+      }
+      setLog([]);
+      setLogStatus({ status: "ok" });
+    } catch (err) {
+      setLogStatus({ status: "error", msg: err.message });
+    }
+  }
+
+  const forceDie = DIE_TYPES.find((d) => d.key === "force");
+  const mainDice = DIE_TYPES.filter((d) => d.key !== "force");
+
+  return (
+    <div className="relative overflow-hidden border" style={{ borderColor: "#3a3f42", background: "#16191b", boxShadow: "0 0 30px rgba(94,200,216,0.06)" }}>
+      <div className="p-5 sm:p-7">
+        <div className="text-[11px] tracking-[0.25em] uppercase mb-1" style={{ color: "#5ec8d8" }}>SHARED SESSION TOOL</div>
+        <h1 className="text-2xl sm:text-3xl uppercase tracking-wide mb-4" style={{ color: "#e7e2d2", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
+          Dice Roller
+        </h1>
+
+        <div className="mb-4">
+          <label className="text-[11px] tracking-[0.2em] uppercase block mb-1.5" style={{ color: "#8a8f93" }}>
+            Your name (shown in the shared log)
+          </label>
+          <input
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            placeholder="e.g. Kess"
+            className="w-full sm:w-64 bg-transparent border px-2 py-1.5 text-[13px]"
+            style={{ borderColor: "#3a3f42", color: "#e7e2d2" }}
+          />
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-2 mb-2">
+          {mainDice.map((dt) => (
+            <DiceCounter key={dt.key} dieType={dt} count={pool[dt.key]} onChange={(v) => updateDie(dt.key, v)} />
+          ))}
+        </div>
+        <div className="mb-4">
+          <DiceCounter dieType={forceDie} count={pool.force} onChange={(v) => updateDie("force", v)} />
+        </div>
+
+        <div className="flex items-center gap-2 mb-5 flex-wrap">
+          <button
+            onClick={handleRoll}
+            className="text-[12px] tracking-[0.15em] uppercase px-5 py-2"
+            style={{ background: "#ffb000", color: "#101315", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}
+          >
+            Roll
+          </button>
+          <button
+            onClick={() => { setPool(EMPTY_POOL); setLoadedLabel(null); }}
+            className="text-[11px] tracking-[0.15em] uppercase px-4 py-2 border"
+            style={{ color: "#8a8f93", borderColor: "#3a3f42" }}
+          >
+            Clear pool
+          </button>
+          <span className="text-[12px]" style={{ color: "#5a5f62" }}>{poolLabel(pool)}</span>
+        </div>
+
+        {loadedLabel && (
+          <div className="mb-4 -mt-3 text-[11px]" style={{ color: "#5ec8d8" }}>
+            Loaded from {loadedLabel} — add Difficulty/Setback for the check, then Roll.
+          </div>
+        )}
+
+        {difficultyTierLabel(pool) && (
+          <div className="mb-5 -mt-3 text-[13px]" style={{ color: "#8a5ec8", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
+            {difficultyTierLabel(pool)}
+          </div>
+        )}
+
+        {lastResult && (
+          <div className="mb-5 p-3 border" style={{ borderColor: "#ffb00044", background: "#ffb00009" }}>
+            <div className="text-[11px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#ffb000" }}>Last roll</div>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {lastResult.rolls.map((r, i) => (
+                <span key={i} className="flex items-center gap-1.5 text-[12px] px-2 py-1 border" style={{ borderColor: "#2a2e31", color: "#e7e2d2" }}>
+                  <DieFaceIcon img={r.img} label={r.label} size={18} />
+                  {r.face}:
+                  {r.symbols.length ? r.symbols.map((s, si) => <SymbolIcon key={si} sym={s} size={15} />) : <span>—</span>}
+                </span>
+              ))}
+            </div>
+            <div className="text-[14px]" style={{ color: "#e7e2d2" }}><NetResultSummary result={lastResult} /></div>
+          </div>
+        )}
+
+        <div className="pt-4 border-t" style={{ borderColor: "#2a2e31" }}>
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-y-1">
+            <div className="text-[11px] tracking-[0.2em] uppercase" style={{ color: "#8a8f93" }}>Shared roll log</div>
+            <div className="flex items-center gap-3">
+              {logStatus.status === "error" && (
+                <span className="text-[11px]" style={{ color: "#c23b3b" }}>{logStatus.msg}</span>
+              )}
+              {log.length > 0 && (
+                <button
+                  onClick={handleClearLog}
+                  className="text-[11px] tracking-[0.15em] uppercase px-3 py-1 border transition-colors"
+                  style={{ color: "#c23b3b", borderColor: "#c23b3b44" }}
+                >
+                  Clear log
+                </button>
+              )}
+            </div>
+          </div>
+          {log.length === 0 ? (
+            <span className="text-[13px]" style={{ color: "#5a5f62" }}>
+              No rolls yet.{logStatus.status === "error" ? " Shared log isn't reachable yet — see setup note in the repo README." : ""}
+            </span>
+          ) : (
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {log.map((entry) => (
+                <div key={entry.id} className="pb-3" style={{ borderBottom: "1px solid #2a2e31" }}>
+                  <div className="flex justify-between text-[12px] mb-1.5">
+                    <span style={{ color: "#5ec8d8" }}>{entry.player}</span>
+                    <span style={{ color: "#5a5f62" }}>{new Date(entry.ts).toLocaleTimeString()}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-5" style={{ color: "#e7e2d2" }}>
+                    {entry.netSuccess !== 0 ? (
+                      <SymbolTally sym={entry.netSuccess > 0 ? "s" : "f"} count={Math.abs(entry.netSuccess)} size={42} withLabel fontSize={22} />
+                    ) : (
+                      <span style={{ fontSize: 22 }} className="mono-num">0 net</span>
+                    )}
+                    {entry.netAdvantage !== 0 && (
+                      <SymbolTally sym={entry.netAdvantage > 0 ? "a" : "t"} count={Math.abs(entry.netAdvantage)} size={42} withLabel fontSize={22} />
+                    )}
+                    {entry.triumph > 0 && <SymbolTally sym="tr" count={entry.triumph} size={42} withLabel fontSize={22} />}
+                    {entry.despair > 0 && <SymbolTally sym="d" count={entry.despair} size={42} withLabel fontSize={22} />}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="mt-3 text-[11px] leading-relaxed" style={{ color: "#5a5f62" }}>
+            Rolls are computed in your browser from the exact FFG face tables, then posted to a small shared log (polled every 1.5s)
+            so everyone viewing this dashboard sees the same result. Purely a shared-table convenience — it never reads or writes
+            Wounds, Strain, Destiny, or any ledger data. Those stay authoritative in the GM's ledger only.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PipRow({ current, threshold, colorClass, size = "normal" }) {
   const pips = Array.from({ length: threshold }, (_, i) => i < current);
   const dim = size === "small" ? "w-3 h-3" : "w-4 h-4";
@@ -397,6 +803,32 @@ export default function CampaignDashboard() {
   const [pasteText, setPasteText] = useState("");
   const [loadState, setLoadState] = useState({ status: "idle", msg: "" });
   const bootTimer = useRef(null);
+
+  const [playerName, setPlayerName] = useState(() => {
+    try { return localStorage.getItem("swrpg-dice-player-name") || ""; } catch { return ""; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("swrpg-dice-player-name", playerName); } catch { /* ignore */ }
+  }, [playerName]);
+
+  // Clicking a skill's dice pips (Character Sheet tab or Party View table)
+  // jumps to the Dice Roller with that skill's Proficiency/Ability/talent-
+  // Boost dice preloaded. diceSeedRef guarantees a fresh nonce every click,
+  // even re-clicking the same skill, so DiceRollerPanel's effect always
+  // re-applies it instead of bailing out on an unchanged dependency.
+  const [dicePreset, setDicePreset] = useState(null);
+  const diceSeedRef = useRef(0);
+  function loadSkillIntoRoller(skill, characterName) {
+    const proficiency = Math.min(skill.rank, skill.characteristic);
+    const ability = Math.max(skill.rank, skill.characteristic) - proficiency;
+    diceSeedRef.current += 1;
+    setDicePreset({
+      pool: { ...EMPTY_POOL, proficiency, ability, boost: skill.boost || 0 },
+      label: `${characterName} — ${skill.name}`,
+      nonce: diceSeedRef.current,
+    });
+    setViewMode("dice");
+  }
 
   const [live, setLive] = useState({ status: "idle" });
   const [rateLimit, setRateLimit] = useState(null);
@@ -646,6 +1078,18 @@ export default function CampaignDashboard() {
                 ⚔ Party View
               </button>
             )}
+            <button
+              onClick={() => setViewMode("dice")}
+              className="text-[12px] tracking-wide px-3 py-1.5 border transition-colors"
+              style={{
+                color: viewMode === "dice" ? "#101315" : "#e7e2d2",
+                background: viewMode === "dice" ? "#5ec8d8" : "transparent",
+                borderColor: viewMode === "dice" ? "#5ec8d8" : "#3a3f42",
+                fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
+              }}
+            >
+              🎲 Dice Roller
+            </button>
           </div>
         )}
 
@@ -680,7 +1124,9 @@ export default function CampaignDashboard() {
           </div>
         )}
 
-        {viewMode === "party" ? (
+        {viewMode === "dice" ? (
+          <DiceRollerPanel playerName={playerName} setPlayerName={setPlayerName} preset={dicePreset} />
+        ) : viewMode === "party" ? (
           <div className="relative overflow-hidden border" style={{ borderColor: "#3a3f42", background: "#16191b", boxShadow: "0 0 30px rgba(255,176,0,0.06)" }}>
             <div className="p-5 sm:p-7">
               <div className="text-[11px] tracking-[0.25em] uppercase mb-1" style={{ color: "#ffb000" }}>
@@ -810,7 +1256,13 @@ export default function CampaignDashboard() {
                               const s = set.find((x) => x.name === skillDef.name);
                               return (
                                 <td key={ci} className="py-1.5 px-2">
-                                  <SkillPips rank={s?.rank ?? 0} characteristic={s?.characteristic ?? 0} boost={s?.boost ?? 0} />
+                                  <button
+                                    onClick={() => s && loadSkillIntoRoller(s, party[ci]?.name || `Character ${ci + 1}`)}
+                                    title="Load into Dice Roller"
+                                    className="hover:opacity-80 transition-opacity"
+                                  >
+                                    <SkillPips rank={s?.rank ?? 0} characteristic={s?.characteristic ?? 0} boost={s?.boost ?? 0} />
+                                  </button>
                                 </td>
                               );
                             })}
@@ -990,10 +1442,15 @@ export default function CampaignDashboard() {
                       <div className="text-[10px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#5a5f62" }}>{group}</div>
                       <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
                         {skills.filter((s) => s.group === group).map((s, i) => (
-                          <div key={i} className="text-[13px] flex items-center justify-between gap-3">
+                          <button
+                            key={i}
+                            onClick={() => loadSkillIntoRoller(s, active.name || "Unknown")}
+                            title="Load into Dice Roller"
+                            className="text-[13px] flex items-center justify-between gap-3 text-left hover:opacity-80 transition-opacity"
+                          >
                             <span style={{ color: s.career ? "#5ec8d8" : "#e7e2d2" }}>{s.name}</span>
                             <SkillPips rank={s.rank} characteristic={s.characteristic} boost={s.boost} />
-                          </div>
+                          </button>
                         ))}
                       </div>
                     </div>

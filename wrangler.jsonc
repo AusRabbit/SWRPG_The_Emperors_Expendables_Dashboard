@@ -14,5 +14,15 @@
   },
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  // Shared dice-roller log (see worker/index.js /rolls route). Reuses the
+  // same "SWRPG Dashboard Dice Roller" KV namespace as the Test Game
+  // dashboard (one namespace, one key per campaign — see ROLLS_KEY in
+  // worker/index.js) rather than a separate namespace per campaign.
+  // One-time setup still required: bind this namespace to THIS Worker too
+  // (Settings > Bindings > Add > KV Namespace > variable name ROLLS_KV >
+  // select "SWRPG Dashboard Dice Roller"), then redeploy.
+  "kv_namespaces": [
+    { "binding": "ROLLS_KV", "id": "48e2345f07d248eb8bc444cc2290b9e6" }
   ]
 }
