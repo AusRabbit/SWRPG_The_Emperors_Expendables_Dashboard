@@ -369,6 +369,19 @@ function playRandomRollSound() {
   audio.play().catch(() => { /* blocked until a user gesture unlocks audio — see handleRoll */ });
 }
 
+// Mandatory Despair sting (Cameron's own uploaded clip) — plays whenever a
+// new shared-log entry carries a Despair result, regardless of the mute
+// toggle below. This is deliberately not gated on soundOnRef: a Despair is
+// meant to be heard by the whole table. It replaces the ambient roll chime
+// for that entry rather than layering on top of it.
+const DESPAIR_SOUND = "/sounds/despair-scream.wav";
+
+function playDespairSound() {
+  const audio = new Audio(DESPAIR_SOUND);
+  audio.volume = 0.6;
+  audio.play().catch(() => { /* blocked until a user gesture unlocks audio — see handleRoll */ });
+}
+
 // Icon + description readout of the current pool — sits next to Roll/Clear
 // pool so players can see exactly what's selected without reading a plain
 // count string.
@@ -464,9 +477,14 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
       if (!res.ok) throw new Error(`${res.status}`);
       const data = await res.json();
       const rolls = Array.isArray(data.rolls) ? data.rolls : [];
-      const newestId = rolls[0]?.id;
-      if (hasFetchedRef.current && newestId && newestId !== prevTopIdRef.current && soundOnRef.current) {
-        playRandomRollSound();
+      const newest = rolls[0];
+      const newestId = newest?.id;
+      if (hasFetchedRef.current && newestId && newestId !== prevTopIdRef.current) {
+        if (newest.despair > 0) {
+          playDespairSound();
+        } else if (soundOnRef.current) {
+          playRandomRollSound();
+        }
       }
       hasFetchedRef.current = true;
       prevTopIdRef.current = newestId;
