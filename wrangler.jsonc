@@ -15,14 +15,18 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
-  // Shared dice-roller log (see worker/index.js /rolls route). Reuses the
-  // same "SWRPG Dashboard Dice Roller" KV namespace as the Test Game
-  // dashboard (one namespace, one key per campaign — see ROLLS_KEY in
-  // worker/index.js) rather than a separate namespace per campaign.
-  // One-time setup still required: bind this namespace to THIS Worker too
-  // (Settings > Bindings > Add > KV Namespace > variable name ROLLS_KV >
-  // select "SWRPG Dashboard Dice Roller"), then redeploy.
-  "kv_namespaces": [
-    { "binding": "ROLLS_KV", "id": "48e2345f07d248eb8bc444cc2290b9e6" }
+  // Shared dice-roller log (see worker/index.js /rolls route + the RollLog
+  // class). Runs as a Durable Object rather than the previous shared KV
+  // namespace, so writes are serialized (no more lost rolls from two people
+  // posting at once) and reads are strongly consistent (no more up-to-a-
+  // minute lag). new_sqlite_classes provisions it on the SQLite storage
+  // backend, which is available on the Workers Free plan.
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROLL_LOG", "class_name": "RollLog" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["RollLog"] }
   ]
 }

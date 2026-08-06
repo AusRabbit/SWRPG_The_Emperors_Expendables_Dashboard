@@ -125,6 +125,13 @@ const SAMPLE_SCHEMA = `{
       "weapons": [{ "name": "string", "skill": "string", "damage": 0, "crit": 0, "range": "string", "special": "string" }],
       "armor": { "name": "string", "soakBonus": 0, "rangedDefense": 0, "meleeDefense": 0, "defenseBonus": "0 (legacy single value, used for both if rangedDefense/meleeDefense absent)" }
     }
+  ],
+  "npcs": [
+    {
+      "name": "string", "role": "string", "species": "string (or 'Not specified in ledger')",
+      "gender": "string (or 'Not specified in ledger')", "status": "string, e.g. 'Present — ...' or 'Off-screen — ...'",
+      "summary": "string (1-line, player-facing)", "whatPartyKnows": "string (no GM-only secrets)"
+    }
   ]
 }`;
 
@@ -498,6 +505,14 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
     setPool((p) => ({ ...p, difficulty: count }));
   }
 
+  // Quick range/melee Difficulty add-ons — these ADD to whatever base
+  // Difficulty is already selected (e.g. from Quick difficulty), rather
+  // than overwriting it, so a range band stacks on top of the check's
+  // normal difficulty instead of replacing it.
+  function addDifficulty(n) {
+    setPool((p) => ({ ...p, difficulty: (p.difficulty || 0) + n }));
+  }
+
   // FFG "upgrade" rule: converts one Ability die into a Proficiency die.
   function upgradeAbilityToProficiency() {
     setPool((p) => {
@@ -603,7 +618,7 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
         <div className="mb-3">
           <div className="text-[10px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#5a5f62" }}>Quick difficulty</div>
           <div className="flex items-center gap-2 flex-wrap">
-            {[2, 3, 4].map((n) => (
+            {[1, 2, 3, 4, 5].map((n) => (
               <button
                 key={n}
                 onClick={() => setDifficulty(n)}
@@ -611,6 +626,27 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
                 style={{ color: "#8a5ec8", borderColor: "#8a5ec866" }}
               >
                 {n} · {DIFFICULTY_TIER_NAMES[n]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-3">
+          <div className="text-[10px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#5a5f62" }}>Add range/melee difficulty</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {[
+              { n: 2, label: "Melee" },
+              { n: 1, label: "Short Range" },
+              { n: 2, label: "Medium Range" },
+              { n: 3, label: "Long Range" },
+            ].map(({ n, label }) => (
+              <button
+                key={label}
+                onClick={() => addDifficulty(n)}
+                className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors"
+                style={{ color: "#8a5ec8", borderColor: "#8a5ec866" }}
+              >
+                +{n} · {label}
               </button>
             ))}
           </div>
@@ -758,6 +794,78 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
             Wounds, Strain, Destiny, or any ledger data. Those stay authoritative in the GM's ledger only.
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// NPC Summary — player-facing, one-line-per-NPC readout sourced entirely
+// from ledger.json's "npcs" array (itself pulled from the GM master ledger's
+// NPC & Ally section). Deliberately excludes GM-only secrets, clock values,
+// and anything not already written into the ledger — no field here is
+// invented client-side. Grouped into NPCs currently on-site vs. off-screen
+// contacts, per each entry's "status" string.
+function NPCSummaryPanel({ npcs }) {
+  const present = npcs.filter((n) => /^present/i.test(n.status || ""));
+  const offScreen = npcs.filter((n) => !/^present/i.test(n.status || ""));
+
+  const Card = ({ npc }) => (
+    <div className="border p-3 mb-3" style={{ borderColor: "#2a2e31", background: "#101315" }}>
+      <div className="flex items-start justify-between flex-wrap gap-1 mb-1">
+        <span className="text-[15px]" style={{ color: "#e7e2d2", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
+          {npc.name}
+        </span>
+        <span className="text-[10px] tracking-[0.15em] uppercase" style={{ color: "#6fae60" }}>
+          {npc.role}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-0.5 mb-2 text-[11px]" style={{ color: "#5a5f62" }}>
+        <span>Species: <span style={{ color: "#8a8f93" }}>{npc.species || "Not specified in ledger"}</span></span>
+        <span>Gender: <span style={{ color: "#8a8f93" }}>{npc.gender || "Not specified in ledger"}</span></span>
+        <span>{npc.status}</span>
+      </div>
+      {npc.summary && (
+        <p className="text-[13px] italic mb-1.5" style={{ color: "#e7e2d2" }}>{npc.summary}</p>
+      )}
+      {npc.whatPartyKnows && (
+        <p className="text-[12px] leading-relaxed" style={{ color: "#8a8f93" }}>
+          <span className="uppercase tracking-[0.1em]" style={{ color: "#5a5f62" }}>What the party knows — </span>
+          {npc.whatPartyKnows}
+        </p>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="relative overflow-hidden border" style={{ borderColor: "#3a3f42", background: "#16191b", boxShadow: "0 0 30px rgba(111,174,96,0.06)" }}>
+      <div className="p-5 sm:p-7">
+        <div className="text-[11px] tracking-[0.25em] uppercase mb-1" style={{ color: "#6fae60" }}>SHARED SESSION TOOL</div>
+        <h1 className="text-2xl sm:text-3xl uppercase tracking-wide mb-2" style={{ color: "#e7e2d2", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
+          NPC Summary
+        </h1>
+        <p className="text-[11px] leading-relaxed mb-5" style={{ color: "#5a5f62" }}>
+          Player-facing summaries only — pulled directly from the GM's ledger, no GM-only secrets included. Anything not
+          recorded in the ledger is shown as "Not specified" rather than guessed.
+        </p>
+
+        {npcs.length === 0 ? (
+          <span className="text-[13px]" style={{ color: "#5a5f62" }}>No NPC data in the loaded ledger yet.</span>
+        ) : (
+          <>
+            {present.length > 0 && (
+              <div className="mb-5">
+                <div className="text-[10px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8a8f93" }}>On-site / Active</div>
+                {present.map((npc, i) => <Card key={i} npc={npc} />)}
+              </div>
+            )}
+            {offScreen.length > 0 && (
+              <div>
+                <div className="text-[10px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8a8f93" }}>Off-screen Contacts</div>
+                {offScreen.map((npc, i) => <Card key={i} npc={npc} />)}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -1198,6 +1306,18 @@ export default function CampaignDashboard() {
             >
               🎲 Dice Roller
             </button>
+            <button
+              onClick={() => setViewMode("npc")}
+              className="text-[12px] tracking-wide px-3 py-1.5 border transition-colors"
+              style={{
+                color: viewMode === "npc" ? "#101315" : "#e7e2d2",
+                background: viewMode === "npc" ? "#6fae60" : "transparent",
+                borderColor: viewMode === "npc" ? "#6fae60" : "#3a3f42",
+                fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
+              }}
+            >
+              🗒 NPC Summary
+            </button>
           </div>
         )}
 
@@ -1234,6 +1354,8 @@ export default function CampaignDashboard() {
 
         {viewMode === "dice" ? (
           <DiceRollerPanel playerName={playerName} setPlayerName={setPlayerName} preset={dicePreset} />
+        ) : viewMode === "npc" ? (
+          <NPCSummaryPanel npcs={ledger.npcs || []} />
         ) : viewMode === "party" ? (
           <div className="relative overflow-hidden border" style={{ borderColor: "#3a3f42", background: "#16191b", boxShadow: "0 0 30px rgba(255,176,0,0.06)" }}>
             <div className="p-5 sm:p-7">

@@ -71,91 +71,111 @@ async function handleLive(request, env, ctx) {
   return response;
 }
 
-// --- Shared dice roller log -------------------------------------------------
-// Ephemeral, separate from the campaign ledger entirely. Backed by a KV
-// namespace (binding ROLLS_KV — same "SWRPG Dashboard Dice Roller" namespace
-// shared with the Test Game dashboard, just a different key) holding a
-// single JSON array (most recent roll first, trimmed to ROLL_LOG_MAX
-// entries) under this campaign's key. Players' browsers POST a roll after
-// computing it client-side, and everyone viewing the dashboard polls
-// GET /rolls every 1.5s, so a roll shows up for the whole table within a
-// couple seconds.
+// --- Shared dice roller log (Durable Object) --------------------------------
+// Ephemeral, separate from the campaign ledger entirely. Previously backed by
+// a KV namespace, which had two real problems in play: KV writes here were a
+// non-atomic read-modify-write (GET the whole array, mutate in JS, PUT the
+// whole array back), so two rolls posted within the same second or two could
+// race — whichever PUT landed second silently overwrote the first, no merge,
+// so one roll would just vanish. And KV reads are only *eventually*
+// consistent across Cloudflare's edge, so a fresh roll could take anywhere
+// up to ~60-120s to show up for someone polling from a different colo.
+//
+// A Durable Object fixes both. Every request for a given DO id is routed to
+// one specific instance, and that instance handles requests strictly one at
+// a time — true serialization, so the unshift/trim/persist below can never
+// interleave with another POST the way the KV version's read-modify-write
+// could. Its storage is also strongly consistent: a write is visible on the
+// very next read, anywhere, with no propagation delay. We always route to
+// one fixed instance (idFromName below), so there's exactly one
+// always-current copy of the log, not a per-colo cache of it.
+//
+// Players' browsers still POST a roll after computing it client-side, and
+// everyone viewing the dashboard still polls GET /rolls every 1.5s — the
+// client-facing API is unchanged, only the storage underneath it.
 //
 // This never reads or writes data/live.json or ledger.json — Wounds/Strain/
 // Destiny/XP stay entirely under the GM's control via the ledger repo.
-// One-time setup required before this works: bind the same KV namespace
-// used by the Test Game dashboard to this Worker too (Settings > Bindings >
-// Add > KV Namespace, variable name ROLLS_KV), or create a new one and add
-// its id to the kv_namespaces block in wrangler.jsonc, then redeploy.
+//
+// Setup: the RollLog class below is declared in the `migrations` block of
+// wrangler.jsonc using `new_sqlite_classes`, which provisions it on Durable
+// Objects' SQLite storage backend — available on the Workers Free plan
+// (the older KV-backed Durable Object storage needs Workers Paid). No KV
+// namespace is required for this anymore; the old ROLLS_KV binding can be
+// removed once this is deployed and confirmed working.
 
-const ROLLS_KEY = "rolls:emperors-expendables";
 const ROLL_LOG_MAX = 40;
 const CORS_HEADERS = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, DELETE, OPTIONS", "access-control-allow-headers": "content-type" };
 
-async function handleRollsGet(request, env) {
-  if (!env.ROLLS_KV) {
-    return new Response(JSON.stringify({ error: "ROLLS_KV not bound on this Worker yet — see setup note in worker/index.js", rolls: [] }), {
-      status: 200,
-      headers: { "content-type": "application/json", "cache-control": "no-store", ...CORS_HEADERS },
-    });
-  }
-  const raw = await env.ROLLS_KV.get(ROLLS_KEY);
-  const rolls = raw ? JSON.parse(raw) : [];
-  return new Response(JSON.stringify({ rolls }), {
-    status: 200,
-    headers: { "content-type": "application/json", "cache-control": "no-store", ...CORS_HEADERS },
-  });
-}
-
-async function handleRollsPost(request, env) {
-  if (!env.ROLLS_KV) {
-    return new Response(JSON.stringify({ error: "ROLLS_KV not bound on this Worker yet — create a KV namespace and add it to wrangler.jsonc" }), {
-      status: 500,
-      headers: { "content-type": "application/json", ...CORS_HEADERS },
+export class RollLog {
+  constructor(ctx, env) {
+    this.ctx = ctx;
+    this.env = env;
+    this.rolls = [];
+    // Hydrate from durable storage once, before this instance handles its
+    // first request. blockConcurrencyWhile holds off every incoming request
+    // until the callback resolves, so nothing can observe a half-loaded
+    // this.rolls.
+    this.ctx.blockConcurrencyWhile(async () => {
+      this.rolls = (await this.ctx.storage.get("rolls")) || [];
     });
   }
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { "content-type": "application/json", ...CORS_HEADERS } });
+  async fetch(request) {
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
+    if (request.method === "GET") {
+      return new Response(JSON.stringify({ rolls: this.rolls }), {
+        status: 200,
+        headers: { "content-type": "application/json", "cache-control": "no-store", ...CORS_HEADERS },
+      });
+    }
+
+    if (request.method === "POST") {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { "content-type": "application/json", ...CORS_HEADERS } });
+      }
+
+      const entry = {
+        id: crypto.randomUUID(),
+        ts: Date.now(),
+        player: String(body?.player ?? "Unknown").slice(0, 40),
+        poolLabel: String(body?.poolLabel ?? "").slice(0, 200),
+        netSuccess: Number.isFinite(body?.netSuccess) ? body.netSuccess : 0,
+        netAdvantage: Number.isFinite(body?.netAdvantage) ? body.netAdvantage : 0,
+        triumph: Number.isFinite(body?.triumph) ? body.triumph : 0,
+        despair: Number.isFinite(body?.despair) ? body.despair : 0,
+      };
+
+      // A Durable Object instance processes one request to completion before
+      // starting the next, so this read-modify-write is safe from the race
+      // that affected the KV version — no other POST can interleave here.
+      this.rolls.unshift(entry);
+      this.rolls = this.rolls.slice(0, ROLL_LOG_MAX);
+      await this.ctx.storage.put("rolls", this.rolls);
+
+      return new Response(JSON.stringify({ ok: true, entry }), {
+        status: 200,
+        headers: { "content-type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    if (request.method === "DELETE") {
+      this.rolls = [];
+      await this.ctx.storage.put("rolls", []);
+      return new Response(JSON.stringify({ ok: true, rolls: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    return new Response("Method not allowed", { status: 405, headers: CORS_HEADERS });
   }
-
-  const entry = {
-    id: crypto.randomUUID(),
-    ts: Date.now(),
-    player: String(body?.player ?? "Unknown").slice(0, 40),
-    poolLabel: String(body?.poolLabel ?? "").slice(0, 200),
-    netSuccess: Number.isFinite(body?.netSuccess) ? body.netSuccess : 0,
-    netAdvantage: Number.isFinite(body?.netAdvantage) ? body.netAdvantage : 0,
-    triumph: Number.isFinite(body?.triumph) ? body.triumph : 0,
-    despair: Number.isFinite(body?.despair) ? body.despair : 0,
-  };
-
-  const raw = await env.ROLLS_KV.get(ROLLS_KEY);
-  const rolls = raw ? JSON.parse(raw) : [];
-  rolls.unshift(entry);
-  await env.ROLLS_KV.put(ROLLS_KEY, JSON.stringify(rolls.slice(0, ROLL_LOG_MAX)));
-
-  return new Response(JSON.stringify({ ok: true, entry }), {
-    status: 200,
-    headers: { "content-type": "application/json", ...CORS_HEADERS },
-  });
-}
-
-async function handleRollsDelete(request, env) {
-  if (!env.ROLLS_KV) {
-    return new Response(JSON.stringify({ error: "ROLLS_KV not bound on this Worker yet — create a KV namespace and add it to wrangler.jsonc" }), {
-      status: 500,
-      headers: { "content-type": "application/json", ...CORS_HEADERS },
-    });
-  }
-  await env.ROLLS_KV.put(ROLLS_KEY, JSON.stringify([]));
-  return new Response(JSON.stringify({ ok: true, rolls: [] }), {
-    status: 200,
-    headers: { "content-type": "application/json", ...CORS_HEADERS },
-  });
 }
 
 export default {
@@ -165,11 +185,17 @@ export default {
       return handleLive(request, env, ctx);
     }
     if (url.pathname === "/rolls") {
-      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
-      if (request.method === "GET") return handleRollsGet(request, env);
-      if (request.method === "POST") return handleRollsPost(request, env);
-      if (request.method === "DELETE") return handleRollsDelete(request, env);
-      return new Response("Method not allowed", { status: 405, headers: CORS_HEADERS });
+      if (!env.ROLL_LOG) {
+        return new Response(JSON.stringify({ error: "ROLL_LOG Durable Object not bound on this Worker yet — see setup note in worker/index.js", rolls: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json", "cache-control": "no-store", ...CORS_HEADERS },
+        });
+      }
+      // Fixed name -> always the same single DO instance, so the whole
+      // campaign shares exactly one authoritative roll log.
+      const id = env.ROLL_LOG.idFromName("shared-roll-log");
+      const stub = env.ROLL_LOG.get(id);
+      return stub.fetch(request);
     }
     return env.ASSETS.fetch(request);
   },

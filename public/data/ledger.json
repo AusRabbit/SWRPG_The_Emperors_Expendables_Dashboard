@@ -138,5 +138,6 @@
       "weapons": [],
       "armor": { "name": "None currently worn", "soakBonus": 0, "defenseBonus": 0 }
     }
-  ]
+  ],
+  "npcs": []
 }
