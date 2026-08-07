@@ -139,5 +139,168 @@
       "armor": { "name": "None currently worn", "soakBonus": 0, "defenseBonus": 0 }
     }
   ],
-  "npcs": []
+  "npcs": [
+    {
+      "name": "Major Cassian Vorn",
+      "role": "Imperial Handler / Clean-Up Authority",
+      "species": "Human",
+      "gender": "Male",
+      "status": "Not physically present — last remote contact during the post-Vannix debrief; expected to make contact again.",
+      "summary": "The Imperial officer holding coercive authority over the party's collars and running the mission's clean-up operation.",
+      "whatPartyKnows": "Assigned Mission 02 as a hard, non-negotiable order. Assumes the party still has evidence from Vannix and said he'd revisit that matter \"later, and less politely.\" Controls the collars and holds classified mission credentials."
+    },
+    {
+      "name": "Colonel Doran Rennick",
+      "role": "Imperial Army Garrison Commander, Cathal's Reach",
+      "species": "Human",
+      "gender": "Male",
+      "status": "Present at the garrison — not yet directly encountered by the party.",
+      "summary": "The party's Mission 02 target: a weathered garrison commander known for calm, dry humor, and genuine care for his soldiers.",
+      "whatPartyKnows": "Known so far only through the mission briefing as the assigned target. Reputation from the briefing: after a rebel ambush killed several of his soldiers, he refused a doctrinal reprisal massacre and personally hunted the responsible cell instead, leaving the town standing — something Command apparently read as disobedience."
+    },
+    {
+      "name": "Captain Ilse Wove",
+      "role": "Rennick's Second-in-Command",
+      "species": "Human",
+      "gender": "Female",
+      "status": "Not yet appeared in play.",
+      "summary": "Rennick's fiercely loyal second — watchful, blunt, and unimpressed by outsiders.",
+      "whatPartyKnows": "Not yet encountered."
+    },
+    {
+      "name": "Master Sergeant Bant Corrl",
+      "role": "Senior NCO, Cathal's Reach Garrison",
+      "species": "Not specified in ledger",
+      "gender": "Male",
+      "status": "Present — met at the Redfall cantina; disposition currently uncertain.",
+      "summary": "Warm, loud, and beloved by his troops — runs the cantina culture and knows every soldier by name.",
+      "whatPartyKnows": "Was warmly charmed by Eleena at the cantina, then snapped into wary soldier's instinct the moment Imperial ID-sweep officers entered. Hasn't acted for or against the party yet — could vouch for them or stay silent and watch."
+    },
+    {
+      "name": "ID-Sweep Officer (1)",
+      "role": "Imperial ID/Permit Sweep Officer",
+      "species": "Not specified in ledger",
+      "gender": "Male",
+      "status": "Present at the Redfall cantina — distracted, hasn't reported in.",
+      "summary": "Conducting a routine ID/permit sweep; flagged Eleena's forged permits as inconsistent with the spaceport manifest.",
+      "whatPartyKnows": "Was reaching for his comlink to report the discrepancy when Kenno's drunken stagger interrupted him."
+    },
+    {
+      "name": "ID-Sweep Officer (2)",
+      "role": "Imperial ID/Permit Sweep Officer",
+      "species": "Not specified in ledger",
+      "gender": "Male",
+      "status": "Present at the Redfall cantina — watching Vesh.",
+      "summary": "Partnered with the first sweep officer on the cantina check.",
+      "whatPartyKnows": "Fixed his attention on Vesh after catching him leaning in too close to Eleena and Corrl's conversation. Hasn't acted yet."
+    },
+    {
+      "name": "Old Maera Tannis",
+      "role": "Backcountry Homesteader",
+      "species": "Not specified in ledger",
+      "gender": "Not specified in ledger",
+      "status": "Not yet encountered.",
+      "summary": "A homesteader whose family Rennick's troops protected instead of executing during the reprisal order.",
+      "whatPartyKnows": "Not yet encountered."
+    },
+    {
+      "name": "Telsa Brie",
+      "role": "Junior Communications Technician",
+      "species": "Not specified in ledger",
+      "gender": "Not specified in ledger",
+      "status": "Off-screen — status since the Core escape unresolved; not present on Cathal's Reach.",
+      "summary": "Key witness from the Vannix operation.",
+      "whatPartyKnows": "Her whereabouts and status since the escape from the Core are unknown."
+    },
+    {
+      "name": "R6-K4 \"Rusk\"",
+      "role": "Damaged Astromech Droid",
+      "species": "Droid",
+      "gender": "N/A (droid)",
+      "status": "Off-screen — status since the Core escape unresolved.",
+      "summary": "Evidence carrier from the Vannix operation.",
+      "whatPartyKnows": "Whereabouts and condition since the escape from the Core are unknown."
+    },
+    {
+      "name": "Station Chief Arden Vel",
+      "role": "Vannix Station Chief / Whistleblower",
+      "species": "Not specified in ledger",
+      "gender": "Not specified in ledger",
+      "status": "Off-screen — status since the Core escape unresolved.",
+      "summary": "The Vannix station chief who blew the whistle.",
+      "whatPartyKnows": "Whereabouts and status since the escape from the Core are unknown."
+    },
+    {
+      "name": "Kalax",
+      "role": "Rival Prisoner / Temporary Vannix Ally",
+      "species": "Not specified in ledger",
+      "gender": "Not specified in ledger",
+      "status": "Off-screen — status unresolved.",
+      "summary": "A prisoner who briefly allied with the party during the Vannix operation.",
+      "whatPartyKnows": "Was blamed by the party during the post-Vannix debrief with Vorn. His fate hasn't been confirmed."
+    },
+    {
+      "name": "Sera (Kalax's Enforcer)",
+      "role": "Kalax's Enforcer",
+      "species": "Not specified in ledger",
+      "gender": "Female",
+      "status": "Off-screen — status unresolved.",
+      "summary": "Enforcer aligned with Kalax during the Vannix operation.",
+      "whatPartyKnows": "Was blamed alongside Kalax during the debrief with Vorn. Her fate hasn't been confirmed."
+    },
+    {
+      "name": "Lieutenant Sera Korr",
+      "role": "Wounded Imperial Security Officer",
+      "species": "Not specified in ledger",
+      "gender": "Not specified in ledger",
+      "status": "Not relevant to the current arc.",
+      "summary": "A wounded Imperial officer from the Vannix continuity, distinct from Kalax's enforcer of the same first name.",
+      "whatPartyKnows": "Not relevant to the current arc."
+    },
+    {
+      "name": "Galdrek Voss",
+      "role": "Pirate Prisoner (Vannix False-Flag)",
+      "species": "Weequay",
+      "gender": "Not specified in ledger",
+      "status": "Not relevant to the current arc.",
+      "summary": "A Weequay pirate prisoner staged as part of the Vannix false-flag operation.",
+      "whatPartyKnows": "Not relevant to the current arc."
+    },
+    {
+      "name": "Sergeant Lysa Venn",
+      "role": "Detention Authority",
+      "species": "Not specified in ledger",
+      "gender": "Not specified in ledger",
+      "status": "Not relevant to the current arc.",
+      "summary": "The detention authority overseeing the party's original intake.",
+      "whatPartyKnows": "Not relevant to the current arc."
+    },
+    {
+      "name": "RX-44 \"Rex\"",
+      "role": "Damaged Security Droid",
+      "species": "Droid",
+      "gender": "N/A (droid)",
+      "status": "Not relevant to the current arc.",
+      "summary": "A damaged security droid from the party's original prison context.",
+      "whatPartyKnows": "Not relevant to the current arc."
+    },
+    {
+      "name": "Elo Kesh",
+      "role": "Cage-Market Broker / Information Contact",
+      "species": "Not specified in ledger",
+      "gender": "Not specified in ledger",
+      "status": "Not relevant to the current arc, but may resurface.",
+      "summary": "An information broker operating out of the cage market.",
+      "whatPartyKnows": "Not relevant to the current arc."
+    },
+    {
+      "name": "Cautious Nikto",
+      "role": "Former Contact (Deceased)",
+      "species": "Nikto",
+      "gender": "Not specified in ledger",
+      "status": "Deceased.",
+      "summary": "A Nikto contact from earlier in the campaign.",
+      "whatPartyKnows": "Killed by Eleena's frag grenade during the Vannix crash-breach escape."
+    }
+  ]
 }
