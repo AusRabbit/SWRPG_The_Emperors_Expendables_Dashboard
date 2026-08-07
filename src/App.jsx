@@ -382,6 +382,18 @@ function playDespairSound() {
   audio.play().catch(() => { /* blocked until a user gesture unlocks audio — see handleRoll */ });
 }
 
+// Mandatory Triumph sting (Cameron's own uploaded clip) — plays whenever a
+// new shared-log entry carries a Triumph result, regardless of the mute
+// toggle below. Same treatment as Despair: a Triumph is meant to be heard by
+// the whole table, and replaces the ambient roll chime for that entry.
+const TRIUMPH_SOUND = "/sounds/triumph-sound.wav";
+
+function playTriumphSound() {
+  const audio = new Audio(TRIUMPH_SOUND);
+  audio.volume = 0.6;
+  audio.play().catch(() => { /* blocked until a user gesture unlocks audio — see handleRoll */ });
+}
+
 // Icon + description readout of the current pool — sits next to Roll/Clear
 // pool so players can see exactly what's selected without reading a plain
 // count string.
@@ -482,6 +494,8 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
       if (hasFetchedRef.current && newestId && newestId !== prevTopIdRef.current) {
         if (newest.despair > 0) {
           playDespairSound();
+        } else if (newest.triumph > 0) {
+          playTriumphSound();
         } else if (soundOnRef.current) {
           playRandomRollSound();
         }
