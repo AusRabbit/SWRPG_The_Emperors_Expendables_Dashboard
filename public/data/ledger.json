@@ -10,7 +10,7 @@
       "vitals": {
         "wounds": { "current": 0, "threshold": 10 },
         "strain": { "current": 0, "threshold": 14 },
-        "soak": 1,
+        "soak": 2,
         "criticalInjuries": []
       },
       "destiny": { "light": 2, "dark": 2 },
@@ -44,7 +44,7 @@
         { "name": "Stalker", "rank": 1, "tier": 2, "description": "Add Boost per rank to Stealth and Coordination checks.", "boostsSkills": ["Stealth", "Coordination"] }
       ],
       "weapons": [],
-      "armor": { "name": "None currently worn", "soakBonus": 0, "defenseBonus": 0 }
+      "armor": { "name": "Sturdy Clothing", "soakBonus": 1, "defenseBonus": 0 }
     },
     {
       "name": "Kennaud \"Kenno\" Thorn",
@@ -55,7 +55,7 @@
       "vitals": {
         "wounds": { "current": 0, "threshold": 14 },
         "strain": { "current": 0, "threshold": 13 },
-        "soak": 3,
+        "soak": 4,
         "criticalInjuries": []
       },
       "destiny": { "light": 2, "dark": 2 },
@@ -92,7 +92,7 @@
         { "name": "Physical Training", "rank": 1, "tier": 2, "description": "Add Boost per rank to Athletics and Resilience checks.", "boostsSkills": ["Athletics", "Resilience"] }
       ],
       "weapons": [],
-      "armor": { "name": "None currently worn", "soakBonus": 0, "defenseBonus": 0 }
+      "armor": { "name": "Sturdy Clothing", "soakBonus": 1, "defenseBonus": 0 }
     },
     {
       "name": "Vesh Talorr",
@@ -103,7 +103,7 @@
       "vitals": {
         "wounds": { "current": 0, "threshold": 12 },
         "strain": { "current": 0, "threshold": 12 },
-        "soak": 2,
+        "soak": 3,
         "criticalInjuries": []
       },
       "destiny": { "light": 2, "dark": 2 },
@@ -136,7 +136,7 @@
         { "name": "Trust the Captain", "rank": 1, "tier": 3, "description": "Make a Hard Leadership check. If successful, for the rest of the encounter allies within short range increase their ranks in Discipline by an amount equal to ranks in Trust the Captain." }
       ],
       "weapons": [],
-      "armor": { "name": "None currently worn", "soakBonus": 0, "defenseBonus": 0 }
+      "armor": { "name": "Sturdy Clothing", "soakBonus": 1, "defenseBonus": 0 }
     }
   ],
   "npcs": [
