@@ -4,7 +4,7 @@
     {
       "name": "Eleena Daru",
       "liveId": "eleena",
-      "career": "Provisional Smuggler — Thief/Scoundrel",
+      "career": "Smuggler — Scoundrel",
       "species": "Twi'lek",
       "updated": "2026-07-29T00:00:00Z",
       "vitals": {
@@ -18,7 +18,8 @@
       "credits": 0,
       "inventory": [
         { "name": "Forged surveying/outfitter permits", "note": "currently in an ID-sweep officer's hands at the Redfall cantina, flagged as inconsistent with the spaceport manifest" },
-        { "name": "Cover-appropriate gear only", "note": "personal effects not itemized for Mission 02 — Vorn's team controls the loadout" }
+        { "name": "Cover-appropriate gear only", "note": "personal effects beyond baseline loadout not itemized for Mission 02 — Vorn's team controls the loadout" },
+        { "name": "Requisition Points: 2", "note": "flavor term, not a mechanic — spend to retroactively establish a small plausible item was on hand; GM approves, resets each mission" }
       ],
       "motivationObligation": {
         "motivation": "Whether survivalist self-interest bends toward preserving the massacre evidence and treating witnesses as people rather than tools; now also whether she'll help kill a decent man on Vorn's order",
@@ -43,13 +44,16 @@
         { "name": "Deep Pockets", "rank": 1, "tier": 1, "description": "Once per session, produce a small narratively useful item from pockets/bag; generally under 100 credits and encumbrance 0–1, subject to GM approval." },
         { "name": "Stalker", "rank": 1, "tier": 2, "description": "Add Boost per rank to Stealth and Coordination checks.", "boostsSkills": ["Stealth", "Coordination"] }
       ],
-      "weapons": [],
+      "weapons": [
+        { "name": "Holdout Blaster", "skill": "Ranged: Light", "damage": 5, "crit": 4, "range": "Short", "special": "Stun setting" },
+        { "name": "Vibroknife", "skill": "Melee", "damage": "Brawn+1", "crit": 2, "range": "Engaged", "special": "Pierce 2" }
+      ],
       "armor": { "name": "Sturdy Clothing", "soakBonus": 1, "defenseBonus": 0 }
     },
     {
       "name": "Kennaud \"Kenno\" Thorn",
       "liveId": "kenno",
-      "career": "Provisional Hired Gun — Mercenary Soldier",
+      "career": "Hired Gun — Mercenary Soldier",
       "species": "Human",
       "updated": "2026-07-29T00:00:00Z",
       "vitals": {
@@ -62,7 +66,8 @@
       "xp": { "available": 15, "total": 15 },
       "credits": 0,
       "inventory": [
-        { "name": "Cover-appropriate gear only", "note": "personal effects not itemized for Mission 02 — Vorn's team controls the loadout; three drinks in as part of the current cantina scene" }
+        { "name": "Cover-appropriate gear only", "note": "personal effects beyond baseline loadout not itemized for Mission 02 — Vorn's team controls the loadout; three drinks in as part of the current cantina scene" },
+        { "name": "Requisition Points: 2", "note": "flavor term, not a mechanic — spend to retroactively establish a small plausible item was on hand; GM approves, resets each mission" }
       ],
       "motivationObligation": {
         "motivation": "Whether he remains a soldier making hard choices or becomes the weapon Vorn wants; served with Colonel Rennick before his fall — an unresolved recognition thread",
@@ -91,13 +96,16 @@
         { "name": "Desperate Recovery", "rank": 1, "tier": 1, "description": "Before healing strain after an encounter, if current strain is more than half threshold, heal 2 additional strain." },
         { "name": "Physical Training", "rank": 1, "tier": 2, "description": "Add Boost per rank to Athletics and Resilience checks.", "boostsSkills": ["Athletics", "Resilience"] }
       ],
-      "weapons": [],
+      "weapons": [
+        { "name": "Holdout Blaster", "skill": "Ranged: Light", "damage": 5, "crit": 4, "range": "Short", "special": "Stun setting" },
+        { "name": "Vibroknife", "skill": "Melee", "damage": "Brawn+1", "crit": 2, "range": "Engaged", "special": "Pierce 2" }
+      ],
       "armor": { "name": "Sturdy Clothing", "soakBonus": 1, "defenseBonus": 0 }
     },
     {
       "name": "Vesh Talorr",
       "liveId": "vesh",
-      "career": "Smuggler — Pilot (\"Talon One\")",
+      "career": "Smuggler — Pilot",
       "species": "Duros",
       "updated": "2026-07-29T00:00:00Z",
       "vitals": {
@@ -110,7 +118,8 @@
       "xp": { "available": 55, "total": 50 },
       "credits": 0,
       "inventory": [
-        { "name": "Cover-appropriate gear only", "note": "personal effects not itemized for Mission 02 — Vorn's team controls the loadout" }
+        { "name": "Cover-appropriate gear only", "note": "personal effects beyond baseline loadout not itemized for Mission 02 — Vorn's team controls the loadout" },
+        { "name": "Requisition Points: 2", "note": "flavor term, not a mechanic — spend to retroactively establish a small plausible item was on hand; GM approves, resets each mission" }
       ],
       "motivationObligation": {
         "motivation": "Whether he treats the evidence as leverage, truth, mission liability, or the path to freeing the group from Cresh Spike collar control",
@@ -135,7 +144,10 @@
         { "name": "Unstoppable", "rank": 1, "tier": 2, "description": "If a Critical Injury roll is 1 or reduced to 1, do not receive the critical injury." },
         { "name": "Trust the Captain", "rank": 1, "tier": 3, "description": "Make a Hard Leadership check. If successful, for the rest of the encounter allies within short range increase their ranks in Discipline by an amount equal to ranks in Trust the Captain." }
       ],
-      "weapons": [],
+      "weapons": [
+        { "name": "Holdout Blaster", "skill": "Ranged: Light", "damage": 5, "crit": 4, "range": "Short", "special": "Stun setting" },
+        { "name": "Vibroknife", "skill": "Melee", "damage": "Brawn+1", "crit": 2, "range": "Engaged", "special": "Pierce 2" }
+      ],
       "armor": { "name": "Sturdy Clothing", "soakBonus": 1, "defenseBonus": 0 }
     }
   ],
