@@ -14,7 +14,7 @@
         "criticalInjuries": []
       },
       "destiny": { "light": 2, "dark": 2 },
-      "xp": { "available": 10, "total": 5 },
+      "xp": { "available": 20, "total": 15 },
       "credits": 0,
       "inventory": [
         { "name": "Forged surveying/outfitter permits", "note": "currently in an ID-sweep officer's hands at the Redfall cantina, flagged as inconsistent with the spaceport manifest" },
@@ -59,7 +59,7 @@
         "criticalInjuries": []
       },
       "destiny": { "light": 2, "dark": 2 },
-      "xp": { "available": 5, "total": 5 },
+      "xp": { "available": 15, "total": 15 },
       "credits": 0,
       "inventory": [
         { "name": "Cover-appropriate gear only", "note": "personal effects not itemized for Mission 02 — Vorn's team controls the loadout; three drinks in as part of the current cantina scene" }
@@ -107,7 +107,7 @@
         "criticalInjuries": []
       },
       "destiny": { "light": 2, "dark": 2 },
-      "xp": { "available": 10, "total": 5 },
+      "xp": { "available": 20, "total": 15 },
       "credits": 0,
       "inventory": [
         { "name": "Cover-appropriate gear only", "note": "personal effects not itemized for Mission 02 — Vorn's team controls the loadout" }
