@@ -107,7 +107,7 @@
         "criticalInjuries": []
       },
       "destiny": { "light": 2, "dark": 2 },
-      "xp": { "available": 20, "total": 15 },
+      "xp": { "available": 55, "total": 50 },
       "credits": 0,
       "inventory": [
         { "name": "Cover-appropriate gear only", "note": "personal effects not itemized for Mission 02 — Vorn's team controls the loadout" }
