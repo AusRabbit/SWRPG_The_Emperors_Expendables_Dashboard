@@ -1226,6 +1226,11 @@ export default function CampaignDashboard() {
   const weapons = active.weapons || [];
   const armor = active.armor || {};
   const activeDefense = getDefense(active);
+  const gearItems = [
+    ...weapons.map((w) => ({ name: w.name, note: `${w.skill} · Dmg ${w.damage} · Crit ${w.crit} · ${w.range}` })),
+    ...(armor.name ? [{ name: armor.name, note: `+${armor.soakBonus ?? 0} Soak · Defense (R/M) ${activeDefense.ranged}/${activeDefense.melee}` }] : []),
+    ...inv,
+  ];
 
   const CHAR_LABELS = [
     ["brawn", "BR"], ["agility", "AG"], ["intellect", "INT"],
@@ -1641,9 +1646,9 @@ export default function CampaignDashboard() {
                 <div className="pt-4 border-t" style={{ borderColor: "#2a2e31" }}>
                   <div className="text-[11px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8a8f93" }}>Gear &amp; Inventory</div>
                   <div className="space-y-2">
-                    {inv.length === 0 && <span className="text-[13px]" style={{ color: "#5a5f62" }}>No items recorded.</span>}
-                    {inv.map((item, i) => (
-                      <div key={i} className="text-[13px] pb-2" style={{ borderBottom: i < inv.length - 1 ? "1px solid #2a2e31" : "none" }}>
+                    {gearItems.length === 0 && <span className="text-[13px]" style={{ color: "#5a5f62" }}>No items recorded.</span>}
+                    {gearItems.map((item, i) => (
+                      <div key={i} className="text-[13px] pb-2" style={{ borderBottom: i < gearItems.length - 1 ? "1px solid #2a2e31" : "none" }}>
                         <div style={{ color: "#e7e2d2" }}>{item.name}</div>
                         {item.note && <div style={{ color: "#5ec8d8" }} className="text-[12px] mt-0.5">{item.note}</div>}
                       </div>
