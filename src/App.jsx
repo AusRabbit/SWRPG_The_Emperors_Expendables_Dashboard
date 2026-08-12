@@ -491,6 +491,16 @@ const EMPTY_POOL = { proficiency: 0, ability: 0, boost: 0, challenge: 0, difficu
 function DiceRollerPanel({ playerName, setPlayerName, preset }) {
   const [pool, setPool] = useState(() => preset?.pool || EMPTY_POOL);
   const [loadedLabel, setLoadedLabel] = useState(preset?.label || null);
+  // Tracks which of the 9 purple difficulty buttons (Quick difficulty +
+  // Add range/melee difficulty) is currently "selected" — they're a single
+  // mutually-exclusive group now, not stackable. Cleared (deselected)
+  // whenever the pool's Difficulty/Challenge dice change some other way
+  // (manual counter edit, Clear pool, or loading a skill's dice), since at
+  // that point the pool no longer reflects any one preset. NOT cleared by
+  // the Difficulty → Challenge upgrade button, since upgrading is treated
+  // as intensifying the same selected tier rather than changing it — see
+  // upgradeDifficultyToChallenge below.
+  const [selectedDifficultyPreset, setSelectedDifficultyPreset] = useState(null);
   const [lastResult, setLastResult] = useState(null);
   const [log, setLog] = useState([]);
   const [logStatus, setLogStatus] = useState({ status: "idle" });
@@ -552,24 +562,28 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
     if (preset) {
       setPool(preset.pool);
       setLoadedLabel(preset.label || null);
+      setSelectedDifficultyPreset(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset?.nonce]);
 
   function updateDie(key, value) {
     setPool((p) => ({ ...p, [key]: value }));
+    // A manual edit to Difficulty or Challenge means the pool no longer
+    // reflects any one of the 9 preset buttons — deselect.
+    if (key === "difficulty" || key === "challenge") {
+      setSelectedDifficultyPreset(null);
+    }
   }
 
-  function setDifficulty(count) {
-    setPool((p) => ({ ...p, difficulty: count }));
-  }
-
-  // Quick range/melee Difficulty add-ons — these ADD to whatever base
-  // Difficulty is already selected (e.g. from Quick difficulty), rather
-  // than overwriting it, so a range band stacks on top of the check's
-  // normal difficulty instead of replacing it.
-  function addDifficulty(n) {
-    setPool((p) => ({ ...p, difficulty: (p.difficulty || 0) + n }));
+  // The 9 purple difficulty buttons (5 Quick difficulty tiers + 4 range/
+  // melee presets) are a single mutually-exclusive group: picking one sets
+  // the Difficulty pool to exactly what it represents (clearing any prior
+  // Challenge-die upgrade, since that belonged to whichever tier was
+  // selected before) and marks it as the selected button.
+  function selectDifficultyPreset(id, count) {
+    setPool((p) => ({ ...p, difficulty: count, challenge: 0 }));
+    setSelectedDifficultyPreset(id);
   }
 
   // FFG "upgrade" rule: converts one Ability die into a Proficiency die.
@@ -679,37 +693,49 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
         <div className="mb-3">
           <div className="text-[10px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#5a5f62" }}>Quick difficulty</div>
           <div className="flex items-center gap-2 flex-wrap">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                onClick={() => setDifficulty(n)}
-                className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors"
-                style={{ color: "#8a5ec8", borderColor: "#8a5ec866" }}
-              >
-                {n} · {DIFFICULTY_TIER_NAMES[n]}
-              </button>
-            ))}
+            {[1, 2, 3, 4, 5].map((n) => {
+              const id = `quick-${n}`;
+              const active = selectedDifficultyPreset === id;
+              return (
+                <button
+                  key={n}
+                  onClick={() => selectDifficultyPreset(id, n)}
+                  className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors"
+                  style={active
+                    ? { background: "#8a5ec8", color: "#101315", borderColor: "#8a5ec8", fontWeight: 700 }
+                    : { color: "#8a5ec8", borderColor: "#8a5ec866" }}
+                >
+                  {n} · {DIFFICULTY_TIER_NAMES[n]}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         <div className="mb-3">
-          <div className="text-[10px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#5a5f62" }}>Add range/melee difficulty</div>
+          <div className="text-[10px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#5a5f62" }}>Range/melee difficulty</div>
           <div className="flex items-center gap-2 flex-wrap">
             {[
               { n: 2, label: "Melee" },
               { n: 1, label: "Short Range" },
               { n: 2, label: "Medium Range" },
               { n: 3, label: "Long Range" },
-            ].map(({ n, label }) => (
-              <button
-                key={label}
-                onClick={() => addDifficulty(n)}
-                className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors"
-                style={{ color: "#8a5ec8", borderColor: "#8a5ec866" }}
-              >
-                +{n} · {label}
-              </button>
-            ))}
+            ].map(({ n, label }) => {
+              const id = `range-${label}`;
+              const active = selectedDifficultyPreset === id;
+              return (
+                <button
+                  key={label}
+                  onClick={() => selectDifficultyPreset(id, n)}
+                  className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors"
+                  style={active
+                    ? { background: "#8a5ec8", color: "#101315", borderColor: "#8a5ec8", fontWeight: 700 }
+                    : { color: "#8a5ec8", borderColor: "#8a5ec866" }}
+                >
+                  {n} · {label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -757,7 +783,7 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
               Roll
             </button>
             <button
-              onClick={() => { setPool(EMPTY_POOL); setLoadedLabel(null); }}
+              onClick={() => { setPool(EMPTY_POOL); setLoadedLabel(null); setSelectedDifficultyPreset(null); }}
               className="text-[11px] tracking-[0.15em] uppercase px-4 py-2 border"
               style={{ color: "#8a8f93", borderColor: "#3a3f42" }}
             >
