@@ -30,7 +30,7 @@ import { useState, useEffect, useRef } from "react";
 // bottom-to-top in the stat's own color when the number goes UP, top-to-
 // bottom in green when it goes DOWN. See lastChangeRef / SWEEP_MS below.
 // ---------------------------------------------------------------------------
-const LIVE_POLL_MS = 5_000;
+const LIVE_POLL_MS = 2_500;
 const SWEEP_MS = 950;
 const PULSE_MS = 2400;
 
@@ -682,6 +682,8 @@ function DiceRollerPanel({
   const forceDie = DIE_TYPES.find((d) => d.key === "force");
   const mainDice = DIE_TYPES.filter((d) => d.key !== "force");
   const setbackDie = DIE_TYPES.find((d) => d.key === "setback");
+  const difficultyDie = DIE_TYPES.find((d) => d.key === "difficulty");
+  const boostDie = DIE_TYPES.find((d) => d.key === "boost");
 
   return (
     <div className="relative overflow-hidden border" style={{ borderColor: "#3a3f42", background: "#16191b", boxShadow: "0 0 30px rgba(94,200,216,0.06)" }}>
@@ -742,12 +744,17 @@ function DiceRollerPanel({
                 <button
                   key={n}
                   onClick={() => selectDifficultyPreset(id, n)}
-                  className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors"
+                  className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors inline-flex items-center gap-1.5"
                   style={active
                     ? { background: "#8a5ec8", color: "#101315", borderColor: "#8a5ec8", fontWeight: 700 }
                     : { color: "#8a5ec8", borderColor: "#8a5ec866" }}
                 >
-                  {n} · {DIFFICULTY_TIER_NAMES[n]}
+                  <span className="flex items-center gap-0.5">
+                    {Array.from({ length: n }, (_, i) => (
+                      <DieFaceIcon key={i} img={difficultyDie.img} label={difficultyDie.label} size={15} />
+                    ))}
+                  </span>
+                  · {DIFFICULTY_TIER_NAMES[n]}
                 </button>
               );
             })}
@@ -769,12 +776,17 @@ function DiceRollerPanel({
                 <button
                   key={label}
                   onClick={() => selectDifficultyPreset(id, n)}
-                  className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors"
+                  className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors inline-flex items-center gap-1.5"
                   style={active
                     ? { background: "#8a5ec8", color: "#101315", borderColor: "#8a5ec8", fontWeight: 700 }
                     : { color: "#8a5ec8", borderColor: "#8a5ec866" }}
                 >
-                  {n} · {label}
+                  <span className="flex items-center gap-0.5">
+                    {Array.from({ length: n }, (_, i) => (
+                      <DieFaceIcon key={i} img={difficultyDie.img} label={difficultyDie.label} size={15} />
+                    ))}
+                  </span>
+                  · {label}
                 </button>
               );
             })}
@@ -785,11 +797,11 @@ function DiceRollerPanel({
           <div className="text-[10px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#5a5f62" }}>Maneuvers</div>
           <div className="flex items-center gap-2 flex-wrap">
             {[
-              { id: "aim", boost: 1, setback: 0, label: "Aim", color: "#5ec8d8" },
-              { id: "double-aim", boost: 2, setback: 0, label: "Double Aim", color: "#5ec8d8" },
-              { id: "called-shot", boost: 0, setback: 2, label: "Called Shot", color: "#8a8f93", tooltipSetback: 2 },
-              { id: "double-called-shot", boost: 0, setback: 1, label: "Double Called Shot", color: "#8a8f93", tooltipSetback: 1 },
-            ].map(({ id, boost, setback, label, color, tooltipSetback }) => {
+              { id: "aim", boost: 1, setback: 0, label: "Aim", color: "#5ec8d8", tooltipDie: boostDie, tooltipCount: 1, tooltipPrefix: "Gain", tooltipSuffix: "on the next combat check" },
+              { id: "double-aim", boost: 2, setback: 0, label: "Double Aim", color: "#5ec8d8", tooltipDie: boostDie, tooltipCount: 2, tooltipPrefix: "Gain", tooltipSuffix: "on the next combat check" },
+              { id: "called-shot", boost: 0, setback: 2, label: "Called Shot", color: "#8a8f93", tooltipDie: setbackDie, tooltipCount: 2, tooltipPrefix: "Target a specific part of the target. The next combat check suffers" },
+              { id: "double-called-shot", boost: 0, setback: 1, label: "Double Called Shot", color: "#8a8f93", tooltipDie: setbackDie, tooltipCount: 1, tooltipPrefix: "Target a specific part of the target. The next combat check suffers" },
+            ].map(({ id, boost, setback, label, color, tooltipDie, tooltipCount, tooltipPrefix, tooltipSuffix }) => {
               const active = selectedManeuver === id;
               return (
                 <div key={id} className="relative group">
@@ -802,17 +814,18 @@ function DiceRollerPanel({
                   >
                     {label}
                   </button>
-                  {tooltipSetback > 0 && (
+                  {tooltipCount > 0 && (
                     <div
-                      className="hidden group-hover:flex absolute left-0 top-full mt-1.5 z-20 items-center gap-1.5 px-3 py-2 border normal-case text-left"
+                      className="hidden group-hover:flex absolute left-0 top-full mt-1.5 z-20 items-center flex-wrap gap-1.5 px-3 py-2 border normal-case text-left"
                       style={{ width: 230, borderColor: "#3a3f42", background: "#101315", color: "#e7e2d2", fontSize: 11, lineHeight: 1.4, letterSpacing: "normal" }}
                     >
-                      <span>Target a specific part of the target. The next combat check suffers</span>
+                      <span>{tooltipPrefix}</span>
                       <span className="flex items-center gap-0.5 flex-shrink-0">
-                        {Array.from({ length: tooltipSetback }, (_, i) => (
-                          <DieFaceIcon key={i} img={setbackDie.img} label={setbackDie.label} size={16} />
+                        {Array.from({ length: tooltipCount }, (_, i) => (
+                          <DieFaceIcon key={i} img={tooltipDie.img} label={tooltipDie.label} size={16} />
                         ))}
                       </span>
+                      {tooltipSuffix && <span>{tooltipSuffix}</span>}
                     </div>
                   )}
                 </div>
