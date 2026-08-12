@@ -488,7 +488,7 @@ function DiceCounter({ dieType, count, onChange }) {
 
 const EMPTY_POOL = { proficiency: 0, ability: 0, boost: 0, challenge: 0, difficulty: 0, setback: 0, force: 0 };
 
-function DiceRollerPanel({ playerName, setPlayerName, preset }) {
+function DiceRollerPanel({ playerName, setPlayerName, preset, partyDestiny }) {
   const [pool, setPool] = useState(() => preset?.pool || EMPTY_POOL);
   const [loadedLabel, setLoadedLabel] = useState(preset?.label || null);
   // Tracks which of the 9 purple difficulty buttons (Quick difficulty +
@@ -586,6 +586,16 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
     setSelectedDifficultyPreset(id);
   }
 
+  // Maneuver quick-adds — Aim/Called Shot stack on top of whatever's
+  // already in the pool (unlike the difficulty presets, these aren't
+  // mutually exclusive with each other or with a selected difficulty tier).
+  function addBoost(n) {
+    setPool((p) => ({ ...p, boost: (p.boost || 0) + n }));
+  }
+  function addSetback(n) {
+    setPool((p) => ({ ...p, setback: (p.setback || 0) + n }));
+  }
+
   // FFG "upgrade" rule: converts one Ability die into a Proficiency die.
   function upgradeAbilityToProficiency() {
     setPool((p) => {
@@ -663,6 +673,22 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
   return (
     <div className="relative overflow-hidden border" style={{ borderColor: "#3a3f42", background: "#16191b", boxShadow: "0 0 30px rgba(94,200,216,0.06)" }}>
       <div className="p-5 sm:p-7">
+        {partyDestiny && (
+          <div className="flex items-center gap-6 flex-wrap mb-4 pb-3 border-b" style={{ borderColor: "#2a2e31" }}>
+            <div className="text-[10px] tracking-[0.2em] uppercase" style={{ color: "#ffb000" }}>Party Destiny Pool</div>
+            <div className="flex items-center gap-1.5">
+              <img src={BLUE_TOKEN} alt="Light Side Destiny Point" style={{ width: 22, height: 22 }} />
+              <span className="text-[13px] mono-num" style={{ color: "#e7e2d2" }}>{partyDestiny.light}</span>
+              <span className="text-[11px]" style={{ color: "#8a8f93" }}>light</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <img src={RED_TOKEN} alt="Dark Side Destiny Point" style={{ width: 22, height: 22 }} />
+              <span className="text-[13px] mono-num" style={{ color: "#e7e2d2" }}>{partyDestiny.dark}</span>
+              <span className="text-[11px]" style={{ color: "#8a8f93" }}>dark</span>
+            </div>
+          </div>
+        )}
+
         <div className="text-[11px] tracking-[0.25em] uppercase mb-1" style={{ color: "#5ec8d8" }}>SHARED SESSION TOOL</div>
         <h1 className="text-2xl sm:text-3xl uppercase tracking-wide mb-4" style={{ color: "#e7e2d2", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
           Dice Roller
@@ -740,6 +766,27 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
         </div>
 
         <div className="mb-5">
+          <div className="text-[10px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#5a5f62" }}>Maneuvers</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {[
+              { fn: () => addBoost(1), label: "Aim", color: "#5ec8d8" },
+              { fn: () => addBoost(2), label: "Double Aim", color: "#5ec8d8" },
+              { fn: () => addSetback(2), label: "Called Shot", color: "#8a8f93" },
+              { fn: () => addSetback(1), label: "Double Called Shot", color: "#8a8f93" },
+            ].map(({ fn, label, color }) => (
+              <button
+                key={label}
+                onClick={fn}
+                className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors"
+                style={{ color, borderColor: `${color}66` }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-5">
           <div className="text-[10px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#5a5f62" }}>Upgrade dice</div>
           <div className="flex items-center gap-2 flex-wrap">
             <button
@@ -754,7 +801,7 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
                 fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
               }}
             >
-              Ability → Proficiency
+              Spend Light Side Destiny Point (Ability → Proficiency)
             </button>
             <button
               onClick={upgradeDifficultyToChallenge}
@@ -768,7 +815,7 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
                 fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
               }}
             >
-              Difficulty → Challenge
+              Spend Dark Side Destiny Point (Difficulty → Challenge)
             </button>
           </div>
         </div>
@@ -1123,6 +1170,10 @@ export default function CampaignDashboard() {
       label: `${characterName} — ${skill.name}`,
       nonce: diceSeedRef.current,
     });
+    // Jumping to the roller from a skill click means "I'm rolling as this
+    // character" — auto-fill Your Name so the shared log attributes it
+    // correctly without the player having to type it themselves.
+    if (characterName) setPlayerName(characterName);
     setViewMode("dice");
   }
 
@@ -1438,7 +1489,7 @@ export default function CampaignDashboard() {
         )}
 
         {viewMode === "dice" ? (
-          <DiceRollerPanel playerName={playerName} setPlayerName={setPlayerName} preset={dicePreset} />
+          <DiceRollerPanel playerName={playerName} setPlayerName={setPlayerName} preset={dicePreset} partyDestiny={partyDestiny} />
         ) : viewMode === "npc" ? (
           <NPCSummaryPanel npcs={ledger.npcs || []} />
         ) : viewMode === "party" ? (
