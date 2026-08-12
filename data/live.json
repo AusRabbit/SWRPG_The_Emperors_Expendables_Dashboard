@@ -1,9 +1,5 @@
 {
   "destiny": { "light": 0, "dark": 4 },
   "wounds": { "eleena": 0, "kenno": 0, "vesh": 0 },
-  "strain": { "eleena": 0, "kenno": 0, "vesh": 2 },
-  "enemy_status": {
-    "id_sweep_officers": "Officer 2 down (Vesh). Officer 1 at 3/4 individual WT, Winded critical injury (Eleena called-shot bite, bypassed Soak). Officer 1 called in a garrison-wide alert.",
-    "corrl": "Joined combat against the party. Missed opening shot at Eleena (0 net success, 1 advantage banked)."
-  }
+  "strain": { "eleena": 0, "kenno": 0, "vesh": 2 }
 }
