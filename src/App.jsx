@@ -30,7 +30,7 @@ import { useState, useEffect, useRef } from "react";
 // bottom-to-top in the stat's own color when the number goes UP, top-to-
 // bottom in green when it goes DOWN. See lastChangeRef / SWEEP_MS below.
 // ---------------------------------------------------------------------------
-const LIVE_POLL_MS = 10_000;
+const LIVE_POLL_MS = 5_000;
 const SWEEP_MS = 950;
 const PULSE_MS = 2400;
 
