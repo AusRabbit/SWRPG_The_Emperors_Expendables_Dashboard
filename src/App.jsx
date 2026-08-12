@@ -488,7 +488,10 @@ function DiceCounter({ dieType, count, onChange }) {
 
 const EMPTY_POOL = { proficiency: 0, ability: 0, boost: 0, challenge: 0, difficulty: 0, setback: 0, force: 0 };
 
-function DiceRollerPanel({ playerName, setPlayerName, preset, partyDestiny }) {
+function DiceRollerPanel({
+  playerName, setPlayerName, preset, partyDestiny,
+  destinyLive, destinyLightSweepOn, destinyDarkSweepOn, destinyLightDir, destinyDarkDir,
+}) {
   const [pool, setPool] = useState(() => preset?.pool || EMPTY_POOL);
   const [loadedLabel, setLoadedLabel] = useState(preset?.label || null);
   // Tracks which of the 9 purple difficulty buttons (Quick difficulty +
@@ -501,6 +504,11 @@ function DiceRollerPanel({ playerName, setPlayerName, preset, partyDestiny }) {
   // as intensifying the same selected tier rather than changing it — see
   // upgradeDifficultyToChallenge below.
   const [selectedDifficultyPreset, setSelectedDifficultyPreset] = useState(null);
+  // Same single-select pattern for the 4 Maneuver buttons (Aim/Double Aim/
+  // Called Shot/Double Called Shot) — only one can be active at a time.
+  // Cleared by a manual Boost/Setback counter edit, Clear pool, or loading
+  // a skill's dice, same as the difficulty group.
+  const [selectedManeuver, setSelectedManeuver] = useState(null);
   const [lastResult, setLastResult] = useState(null);
   const [log, setLog] = useState([]);
   const [logStatus, setLogStatus] = useState({ status: "idle" });
@@ -563,6 +571,7 @@ function DiceRollerPanel({ playerName, setPlayerName, preset, partyDestiny }) {
       setPool(preset.pool);
       setLoadedLabel(preset.label || null);
       setSelectedDifficultyPreset(null);
+      setSelectedManeuver(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset?.nonce]);
@@ -573,6 +582,10 @@ function DiceRollerPanel({ playerName, setPlayerName, preset, partyDestiny }) {
     // reflects any one of the 9 preset buttons — deselect.
     if (key === "difficulty" || key === "challenge") {
       setSelectedDifficultyPreset(null);
+    }
+    // Same idea for the 4 Maneuver buttons and Boost/Setback.
+    if (key === "boost" || key === "setback") {
+      setSelectedManeuver(null);
     }
   }
 
@@ -586,14 +599,13 @@ function DiceRollerPanel({ playerName, setPlayerName, preset, partyDestiny }) {
     setSelectedDifficultyPreset(id);
   }
 
-  // Maneuver quick-adds — Aim/Called Shot stack on top of whatever's
-  // already in the pool (unlike the difficulty presets, these aren't
-  // mutually exclusive with each other or with a selected difficulty tier).
-  function addBoost(n) {
-    setPool((p) => ({ ...p, boost: (p.boost || 0) + n }));
-  }
-  function addSetback(n) {
-    setPool((p) => ({ ...p, setback: (p.setback || 0) + n }));
+  // The 4 Maneuver buttons (Aim/Double Aim/Called Shot/Double Called Shot)
+  // are also a single mutually-exclusive group — only one maneuver can be
+  // in effect at once, so picking one sets Boost/Setback to exactly what
+  // it represents (clearing the other) rather than stacking.
+  function selectManeuver(id, boost, setback) {
+    setPool((p) => ({ ...p, boost, setback }));
+    setSelectedManeuver(id);
   }
 
   // FFG "upgrade" rule: converts one Ability die into a Proficiency die.
@@ -674,16 +686,19 @@ function DiceRollerPanel({ playerName, setPlayerName, preset, partyDestiny }) {
     <div className="relative overflow-hidden border" style={{ borderColor: "#3a3f42", background: "#16191b", boxShadow: "0 0 30px rgba(94,200,216,0.06)" }}>
       <div className="p-5 sm:p-7">
         {partyDestiny && (
-          <div className="flex items-center gap-6 flex-wrap mb-4 pb-3 border-b" style={{ borderColor: "#2a2e31" }}>
-            <div className="text-[10px] tracking-[0.2em] uppercase" style={{ color: "#ffb000" }}>Party Destiny Pool</div>
+          <div className="border p-3 mb-4 flex items-center gap-6 flex-wrap" style={{ borderColor: "#ffb00055", background: "#ffb00009" }}>
+            <div className="text-[11px] tracking-[0.2em] uppercase flex items-center gap-1.5" style={{ color: "#ffb000" }}>
+              Party Destiny Pool
+              {destinyLive && (
+                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#6fae60" }} />
+              )}
+            </div>
             <div className="flex items-center gap-1.5">
-              <img src={BLUE_TOKEN} alt="Light Side Destiny Point" style={{ width: 22, height: 22 }} />
-              <span className="text-[13px] mono-num" style={{ color: "#e7e2d2" }}>{partyDestiny.light}</span>
+              <DestinyTokens count={partyDestiny.light} src={BLUE_TOKEN} alt="Light Side Destiny Point" sweepActive={destinyLightSweepOn} sweepDir={destinyLightDir} sweepColor="#8fd3f4" />
               <span className="text-[11px]" style={{ color: "#8a8f93" }}>light</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <img src={RED_TOKEN} alt="Dark Side Destiny Point" style={{ width: 22, height: 22 }} />
-              <span className="text-[13px] mono-num" style={{ color: "#e7e2d2" }}>{partyDestiny.dark}</span>
+              <DestinyTokens count={partyDestiny.dark} src={RED_TOKEN} alt="Dark Side Destiny Point" sweepActive={destinyDarkSweepOn} sweepDir={destinyDarkDir} sweepColor="#c23b3b" />
               <span className="text-[11px]" style={{ color: "#8a8f93" }}>dark</span>
             </div>
           </div>
@@ -769,20 +784,25 @@ function DiceRollerPanel({ playerName, setPlayerName, preset, partyDestiny }) {
           <div className="text-[10px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#5a5f62" }}>Maneuvers</div>
           <div className="flex items-center gap-2 flex-wrap">
             {[
-              { fn: () => addBoost(1), label: "Aim", color: "#5ec8d8" },
-              { fn: () => addBoost(2), label: "Double Aim", color: "#5ec8d8" },
-              { fn: () => addSetback(2), label: "Called Shot", color: "#8a8f93" },
-              { fn: () => addSetback(1), label: "Double Called Shot", color: "#8a8f93" },
-            ].map(({ fn, label, color }) => (
-              <button
-                key={label}
-                onClick={fn}
-                className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors"
-                style={{ color, borderColor: `${color}66` }}
-              >
-                {label}
-              </button>
-            ))}
+              { id: "aim", boost: 1, setback: 0, label: "Aim", color: "#5ec8d8" },
+              { id: "double-aim", boost: 2, setback: 0, label: "Double Aim", color: "#5ec8d8" },
+              { id: "called-shot", boost: 0, setback: 2, label: "Called Shot", color: "#8a8f93" },
+              { id: "double-called-shot", boost: 0, setback: 1, label: "Double Called Shot", color: "#8a8f93" },
+            ].map(({ id, boost, setback, label, color }) => {
+              const active = selectedManeuver === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => selectManeuver(id, boost, setback)}
+                  className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors"
+                  style={active
+                    ? { background: color, color: "#101315", borderColor: color, fontWeight: 700 }
+                    : { color, borderColor: `${color}66` }}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -801,7 +821,9 @@ function DiceRollerPanel({ playerName, setPlayerName, preset, partyDestiny }) {
                 fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
               }}
             >
-              Spend Light Side Destiny Point (Ability → Proficiency)
+              <span className="inline-flex items-center gap-1.5">
+                Spend <img src={BLUE_TOKEN} alt="Light Side Destiny Point" style={{ width: 16, height: 16 }} /> (Ability → Proficiency)
+              </span>
             </button>
             <button
               onClick={upgradeDifficultyToChallenge}
@@ -815,7 +837,9 @@ function DiceRollerPanel({ playerName, setPlayerName, preset, partyDestiny }) {
                 fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
               }}
             >
-              Spend Dark Side Destiny Point (Difficulty → Challenge)
+              <span className="inline-flex items-center gap-1.5">
+                Spend <img src={RED_TOKEN} alt="Dark Side Destiny Point" style={{ width: 16, height: 16 }} /> (Difficulty → Challenge)
+              </span>
             </button>
           </div>
         </div>
@@ -830,7 +854,7 @@ function DiceRollerPanel({ playerName, setPlayerName, preset, partyDestiny }) {
               Roll
             </button>
             <button
-              onClick={() => { setPool(EMPTY_POOL); setLoadedLabel(null); setSelectedDifficultyPreset(null); }}
+              onClick={() => { setPool(EMPTY_POOL); setLoadedLabel(null); setSelectedDifficultyPreset(null); setSelectedManeuver(null); }}
               className="text-[11px] tracking-[0.15em] uppercase px-4 py-2 border"
               style={{ color: "#8a8f93", borderColor: "#3a3f42" }}
             >
@@ -903,7 +927,7 @@ function DiceRollerPanel({ playerName, setPlayerName, preset, partyDestiny }) {
                     {entry.netSuccess !== 0 ? (
                       <SymbolTally sym={entry.netSuccess > 0 ? "s" : "f"} count={Math.abs(entry.netSuccess)} size={42} withLabel fontSize={22} />
                     ) : (
-                      <span style={{ fontSize: 22, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>Failure</span>
+                      <span style={{ fontSize: 22, fontFamily: "'Rajdhani', sans-serif", fontWeight: 600 }}>Failure</span>
                     )}
                     {entry.netAdvantage !== 0 && (
                       <SymbolTally sym={entry.netAdvantage > 0 ? "a" : "t"} count={Math.abs(entry.netAdvantage)} size={42} withLabel fontSize={22} />
@@ -1489,7 +1513,17 @@ export default function CampaignDashboard() {
         )}
 
         {viewMode === "dice" ? (
-          <DiceRollerPanel playerName={playerName} setPlayerName={setPlayerName} preset={dicePreset} partyDestiny={partyDestiny} />
+          <DiceRollerPanel
+            playerName={playerName}
+            setPlayerName={setPlayerName}
+            preset={dicePreset}
+            partyDestiny={partyDestiny}
+            destinyLive={partyOverlays.some((o) => o.destinyLive)}
+            destinyLightSweepOn={destinyLightSweepOn}
+            destinyDarkSweepOn={destinyDarkSweepOn}
+            destinyLightDir={lc.destinyLightDir}
+            destinyDarkDir={lc.destinyDarkDir}
+          />
         ) : viewMode === "npc" ? (
           <NPCSummaryPanel npcs={ledger.npcs || []} />
         ) : viewMode === "party" ? (
