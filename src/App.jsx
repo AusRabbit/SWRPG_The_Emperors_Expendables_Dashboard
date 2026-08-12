@@ -294,25 +294,6 @@ function SymbolTally({ sym, count, size = 15, withLabel = false, fontSize }) {
   );
 }
 
-function NetResultSummary({ result, size = 17 }) {
-  return (
-    <span className="flex flex-wrap items-center gap-3">
-      {result.netSuccess !== 0 ? (
-        <SymbolTally sym={result.netSuccess > 0 ? "s" : "f"} count={Math.abs(result.netSuccess)} size={size} />
-      ) : (
-        <span className="text-[13px]">0 net Success/Failure</span>
-      )}
-      {result.netAdvantage !== 0 && (
-        <SymbolTally sym={result.netAdvantage > 0 ? "a" : "t"} count={Math.abs(result.netAdvantage)} size={size} />
-      )}
-      {result.triumph > 0 && <SymbolTally sym="tr" count={result.triumph} size={size} />}
-      {result.despair > 0 && <SymbolTally sym="d" count={result.despair} size={size} />}
-      {result.lightPoint > 0 && <SymbolTally sym="lp" count={result.lightPoint} size={size} />}
-      {result.darkPoint > 0 && <SymbolTally sym="dp" count={result.darkPoint} size={size} />}
-    </span>
-  );
-}
-
 function rollDie(dieType) {
   const face = Math.floor(Math.random() * dieType.sides) + 1;
   return { face, symbols: dieType.faces[face] || [] };
@@ -428,6 +409,34 @@ function PoolIconStrip({ pool, size = 16 }) {
           <span className="text-[11px] mono-num" style={{ color: "#8a8f93" }}>×{pool[dt.key]}</span>
         </span>
       ))}
+    </span>
+  );
+}
+
+// Per-die results readout for the shared roll log — one icon per die that
+// was actually rolled, immediately followed by the symbols it landed on.
+// Deliberately omits the numeric face value (e.g. "7:") — that level of
+// detail is accurate but more than a glance at the log needs; the symbols
+// are what matter at the table. Falls back to PoolIconStrip for older log
+// entries posted before this field existed (they only have entry.pool).
+function RollResultsStrip({ rolls, size = 16 }) {
+  if (!rolls || rolls.length === 0) return null;
+  return (
+    <span className="flex flex-wrap items-center gap-3">
+      {rolls.map((r, i) => {
+        const dt = DIE_TYPES.find((d) => d.key === r.die);
+        if (!dt) return null;
+        return (
+          <span key={i} className="flex items-center gap-1">
+            <DieFaceIcon img={dt.img} label={dt.label} size={size} />
+            {r.symbols && r.symbols.length ? (
+              r.symbols.map((s, si) => <SymbolIcon key={si} sym={s} size={size - 1} />)
+            ) : (
+              <span style={{ color: "#5a5f62" }}>—</span>
+            )}
+          </span>
+        );
+      })}
     </span>
   );
 }
@@ -595,6 +604,7 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
       player: (playerName || "Unnamed").slice(0, 40),
       poolLabel: poolLabel(pool),
       pool: { ...pool },
+      rolls: result.rolls.map((r) => ({ die: r.die, symbols: r.symbols })),
       netSuccess: result.netSuccess,
       netAdvantage: result.netAdvantage,
       triumph: result.triumph,
@@ -769,22 +779,6 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
           </div>
         )}
 
-        {lastResult && (
-          <div className="mb-5 p-3 border" style={{ borderColor: "#ffb00044", background: "#ffb00009" }}>
-            <div className="text-[11px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#ffb000" }}>Last roll</div>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {lastResult.rolls.map((r, i) => (
-                <span key={i} className="flex items-center gap-1.5 text-[12px] px-2 py-1 border" style={{ borderColor: "#2a2e31", color: "#e7e2d2" }}>
-                  <DieFaceIcon img={r.img} label={r.label} size={18} />
-                  {r.face}:
-                  {r.symbols.length ? r.symbols.map((s, si) => <SymbolIcon key={si} sym={s} size={15} />) : <span>—</span>}
-                </span>
-              ))}
-            </div>
-            <div className="text-[14px]" style={{ color: "#e7e2d2" }}><NetResultSummary result={lastResult} /></div>
-          </div>
-        )}
-
         <div className="pt-4 border-t" style={{ borderColor: "#2a2e31" }}>
           <div className="flex items-center justify-between mb-2 flex-wrap gap-y-1">
             <div className="text-[11px] tracking-[0.2em] uppercase" style={{ color: "#8a8f93" }}>Shared roll log</div>
@@ -823,7 +817,11 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
                     <span style={{ color: "#5ec8d8" }}>{entry.player}</span>
                     <span style={{ color: "#5a5f62" }}>{new Date(entry.ts).toLocaleTimeString()}</span>
                   </div>
-                  {entry.pool && (
+                  {entry.rolls && entry.rolls.length > 0 ? (
+                    <div className="mb-1.5">
+                      <RollResultsStrip rolls={entry.rolls} />
+                    </div>
+                  ) : entry.pool && (
                     <div className="mb-1.5">
                       <PoolIconStrip pool={entry.pool} />
                     </div>
@@ -832,7 +830,7 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
                     {entry.netSuccess !== 0 ? (
                       <SymbolTally sym={entry.netSuccess > 0 ? "s" : "f"} count={Math.abs(entry.netSuccess)} size={42} withLabel fontSize={22} />
                     ) : (
-                      <span style={{ fontSize: 22 }} className="mono-num">0 net</span>
+                      <span style={{ fontSize: 22, fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>Failure</span>
                     )}
                     {entry.netAdvantage !== 0 && (
                       <SymbolTally sym={entry.netAdvantage > 0 ? "a" : "t"} count={Math.abs(entry.netAdvantage)} size={42} withLabel fontSize={22} />
