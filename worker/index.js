@@ -106,6 +106,12 @@ async function handleLive(request, env, ctx) {
 
 const ROLL_LOG_MAX = 40;
 const CORS_HEADERS = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, DELETE, OPTIONS", "access-control-allow-headers": "content-type" };
+// Dice pool breakdown (per die type, e.g. { proficiency: 2, difficulty: 3,
+// setback: 2, ... }) — stored alongside the summarised result so the shared
+// log can render the actual pool as icons, not just the outcome. Sanitized
+// to known die-type keys, non-negative integers, capped at a sane per-die
+// maximum so a malformed/malicious body can't bloat a stored entry.
+const POOL_KEYS = ["proficiency", "ability", "boost", "challenge", "difficulty", "setback", "force"];
 
 export class RollLog {
   constructor(ctx, env) {
@@ -141,11 +147,18 @@ export class RollLog {
         return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { "content-type": "application/json", ...CORS_HEADERS } });
       }
 
+      const pool = {};
+      POOL_KEYS.forEach((key) => {
+        const n = Number(body?.pool?.[key]);
+        pool[key] = Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 20) : 0;
+      });
+
       const entry = {
         id: crypto.randomUUID(),
         ts: Date.now(),
         player: String(body?.player ?? "Unknown").slice(0, 40),
         poolLabel: String(body?.poolLabel ?? "").slice(0, 200),
+        pool,
         netSuccess: Number.isFinite(body?.netSuccess) ? body.netSuccess : 0,
         netAdvantage: Number.isFinite(body?.netAdvantage) ? body.netAdvantage : 0,
         triumph: Number.isFinite(body?.triumph) ? body.triumph : 0,
