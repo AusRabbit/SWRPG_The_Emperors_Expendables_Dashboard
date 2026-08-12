@@ -681,6 +681,7 @@ function DiceRollerPanel({
 
   const forceDie = DIE_TYPES.find((d) => d.key === "force");
   const mainDice = DIE_TYPES.filter((d) => d.key !== "force");
+  const setbackDie = DIE_TYPES.find((d) => d.key === "setback");
 
   return (
     <div className="relative overflow-hidden border" style={{ borderColor: "#3a3f42", background: "#16191b", boxShadow: "0 0 30px rgba(94,200,216,0.06)" }}>
@@ -786,21 +787,35 @@ function DiceRollerPanel({
             {[
               { id: "aim", boost: 1, setback: 0, label: "Aim", color: "#5ec8d8" },
               { id: "double-aim", boost: 2, setback: 0, label: "Double Aim", color: "#5ec8d8" },
-              { id: "called-shot", boost: 0, setback: 2, label: "Called Shot", color: "#8a8f93" },
-              { id: "double-called-shot", boost: 0, setback: 1, label: "Double Called Shot", color: "#8a8f93" },
-            ].map(({ id, boost, setback, label, color }) => {
+              { id: "called-shot", boost: 0, setback: 2, label: "Called Shot", color: "#8a8f93", tooltipSetback: 2 },
+              { id: "double-called-shot", boost: 0, setback: 1, label: "Double Called Shot", color: "#8a8f93", tooltipSetback: 1 },
+            ].map(({ id, boost, setback, label, color, tooltipSetback }) => {
               const active = selectedManeuver === id;
               return (
-                <button
-                  key={id}
-                  onClick={() => selectManeuver(id, boost, setback)}
-                  className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors"
-                  style={active
-                    ? { background: color, color: "#101315", borderColor: color, fontWeight: 700 }
-                    : { color, borderColor: `${color}66` }}
-                >
-                  {label}
-                </button>
+                <div key={id} className="relative group">
+                  <button
+                    onClick={() => selectManeuver(id, boost, setback)}
+                    className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5 border transition-colors"
+                    style={active
+                      ? { background: color, color: "#101315", borderColor: color, fontWeight: 700 }
+                      : { color, borderColor: `${color}66` }}
+                  >
+                    {label}
+                  </button>
+                  {tooltipSetback > 0 && (
+                    <div
+                      className="hidden group-hover:flex absolute left-0 top-full mt-1.5 z-20 items-center gap-1.5 px-3 py-2 border normal-case text-left"
+                      style={{ width: 230, borderColor: "#3a3f42", background: "#101315", color: "#e7e2d2", fontSize: 11, lineHeight: 1.4, letterSpacing: "normal" }}
+                    >
+                      <span>Target a specific part of the target. The next combat check suffers</span>
+                      <span className="flex items-center gap-0.5 flex-shrink-0">
+                        {Array.from({ length: tooltipSetback }, (_, i) => (
+                          <DieFaceIcon key={i} img={setbackDie.img} label={setbackDie.label} size={16} />
+                        ))}
+                      </span>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -822,7 +837,7 @@ function DiceRollerPanel({
               }}
             >
               <span className="inline-flex items-center gap-1.5">
-                Spend <img src={BLUE_TOKEN} alt="Light Side Destiny Point" style={{ width: 16, height: 16 }} /> (Ability → Proficiency)
+                <img src={BLUE_TOKEN} alt="Light Side Destiny Point" style={{ width: 33, height: 33 }} /> (Ability → Proficiency)
               </span>
             </button>
             <button
@@ -838,7 +853,7 @@ function DiceRollerPanel({
               }}
             >
               <span className="inline-flex items-center gap-1.5">
-                Spend <img src={RED_TOKEN} alt="Dark Side Destiny Point" style={{ width: 16, height: 16 }} /> (Difficulty → Challenge)
+                <img src={RED_TOKEN} alt="Dark Side Destiny Point" style={{ width: 33, height: 33 }} /> (Difficulty → Challenge)
               </span>
             </button>
           </div>
