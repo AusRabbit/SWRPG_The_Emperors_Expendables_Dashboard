@@ -594,6 +594,7 @@ function DiceRollerPanel({ playerName, setPlayerName, preset }) {
     const entry = {
       player: (playerName || "Unnamed").slice(0, 40),
       poolLabel: poolLabel(pool),
+      pool: { ...pool },
       netSuccess: result.netSuccess,
       netAdvantage: result.netAdvantage,
       triumph: result.triumph,
