@@ -51,7 +51,8 @@
         { "name": "Holdout Blaster", "skill": "Ranged: Light", "damage": 5, "crit": 4, "range": "Short", "special": "Stun setting" },
         { "name": "Vibroknife", "skill": "Melee", "damage": "Brawn+1", "crit": 2, "range": "Engaged", "special": "Pierce 2" }
       ],
-      "armor": { "name": "Sturdy Clothing", "soakBonus": 1, "defenseBonus": 0 }
+      "armor": { "name": "Sturdy Clothing", "soakBonus": 1, "defenseBonus": 0 },
+      "portrait": "/portraits/eleena.png"
     },
     {
       "name": "Kennaud \"Kenno\" Thorn",
@@ -107,7 +108,8 @@
         { "name": "Holdout Blaster", "skill": "Ranged: Light", "damage": 5, "crit": 4, "range": "Short", "special": "Stun setting" },
         { "name": "Vibroknife", "skill": "Melee", "damage": "Brawn+1", "crit": 2, "range": "Engaged", "special": "Pierce 2" }
       ],
-      "armor": { "name": "Sturdy Clothing", "soakBonus": 1, "defenseBonus": 0 }
+      "armor": { "name": "Sturdy Clothing", "soakBonus": 1, "defenseBonus": 0 },
+      "portrait": "/portraits/kenno.png"
     },
     {
       "name": "Vesh Talorr",
@@ -119,7 +121,7 @@
         "wounds": { "current": 0, "threshold": 12 },
         "strain": { "current": 0, "threshold": 12 },
         "soak": 3,
-        "criticalInjuries": []
+        "criticalInjuries": ["30 - Discouraging Wound"]
       },
       "destiny": { "light": 2, "dark": 2 },
       "xp": { "available": 55, "total": 50 },
@@ -160,7 +162,8 @@
         { "name": "Holdout Blaster", "skill": "Ranged: Light", "damage": 5, "crit": 4, "range": "Short", "special": "Stun setting" },
         { "name": "Vibroknife", "skill": "Melee", "damage": "Brawn+1", "crit": 2, "range": "Engaged", "special": "Pierce 2" }
       ],
-      "armor": { "name": "Sturdy Clothing", "soakBonus": 1, "defenseBonus": 0 }
+      "armor": { "name": "Sturdy Clothing", "soakBonus": 1, "defenseBonus": 0 },
+      "portrait": "/portraits/vesh.png"
     }
   ],
   "npcs": [
