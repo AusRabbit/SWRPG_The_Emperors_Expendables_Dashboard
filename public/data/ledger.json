@@ -329,5 +329,31 @@
       "summary": "A Nikto contact from earlier in the campaign.",
       "whatPartyKnows": "Killed by Eleena's frag grenade during the Vannix crash-breach escape."
     }
+  ],
+  "locations": [
+    {
+      "name": "Cathal's Reach",
+      "type": "Planet",
+      "current": true,
+      "summary": "Imperial-garrisoned world, current mission setting. Home to Redfall Station and the backcountry beyond it. Held under Colonel Doran Rennick's unusually restrained command."
+    },
+    {
+      "name": "Redfall Station",
+      "type": "Settlement",
+      "current": true,
+      "summary": "Spaceport and logging/timber town on Cathal's Reach; the party's base of operations under cover as an independent surveying outfit. Currently unsettled after the cantina brawl — the party is lying low at a borrowed logger's house on the edge of town."
+    },
+    {
+      "name": "Sure Thing",
+      "type": "Ship",
+      "current": true,
+      "summary": "Z-95-AF4 Headhunter, Vesh's assigned personal craft."
+    },
+    {
+      "name": "Mournful Credit",
+      "type": "Ship",
+      "current": false,
+      "summary": "The staged freighter used to insert the party into Vannix Station on Mission 01. Crashed and burned during the escape from the wreck — no longer exists."
+    }
   ]
 }

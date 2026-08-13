@@ -133,6 +133,13 @@ const SAMPLE_SCHEMA = `{
       "gender": "string (or 'Not specified in ledger')", "status": "string, e.g. 'Present — ...' or 'Off-screen — ...'",
       "summary": "string (1-line, player-facing)", "whatPartyKnows": "string (no GM-only secrets)"
     }
+  ],
+  "locations": [
+    {
+      "name": "string", "type": "string, e.g. 'Planet' / 'Settlement' / 'Ship' / 'Station'",
+      "current": "boolean — true if the party is there now",
+      "summary": "string (1-line, player-facing, no GM-only secrets)"
+    }
   ]
 }`;
 
@@ -1378,6 +1385,64 @@ function GMNotesPanel() {
   );
 }
 
+// Player-facing "where are we right now" reference — planets, settlements,
+// ships. Deliberately simple: no GM secrets, no threat assessments, just a
+// quick reminder of the party's current and past locations. Mirrors
+// NPCSummaryPanel's structure/styling (split into two groups, plain cards).
+function LocationSummaryPanel({ locations }) {
+  const current = locations.filter((l) => l.current);
+  const past = locations.filter((l) => !l.current);
+
+  const Card = ({ loc }) => (
+    <div className="border p-3 mb-3" style={{ borderColor: "#2a2e31", background: "#101315" }}>
+      <div className="flex items-start justify-between flex-wrap gap-1 mb-1">
+        <span className="text-[15px]" style={{ color: "#e7e2d2", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
+          {loc.name}
+        </span>
+        <span className="text-[10px] tracking-[0.15em] uppercase" style={{ color: "#c9a15a" }}>
+          {loc.type}
+        </span>
+      </div>
+      {loc.summary && (
+        <p className="text-[12px] leading-relaxed" style={{ color: "#8a8f93" }}>{loc.summary}</p>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="relative overflow-hidden border" style={{ borderColor: "#3a3f42", background: "#16191b", boxShadow: "0 0 30px rgba(201,161,90,0.06)" }}>
+      <div className="p-5 sm:p-7">
+        <div className="text-[11px] tracking-[0.25em] uppercase mb-1" style={{ color: "#c9a15a" }}>SHARED SESSION TOOL</div>
+        <h1 className="text-2xl sm:text-3xl uppercase tracking-wide mb-2" style={{ color: "#e7e2d2", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
+          Locations
+        </h1>
+        <p className="text-[11px] leading-relaxed mb-5" style={{ color: "#5a5f62" }}>
+          Where the party is, and where they've been — pulled directly from the GM's ledger.
+        </p>
+
+        {locations.length === 0 ? (
+          <span className="text-[13px]" style={{ color: "#5a5f62" }}>No location data in the loaded ledger yet.</span>
+        ) : (
+          <>
+            {current.length > 0 && (
+              <div className="mb-5">
+                <div className="text-[10px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8a8f93" }}>Current</div>
+                {current.map((loc, i) => <Card key={i} loc={loc} />)}
+              </div>
+            )}
+            {past.length > 0 && (
+              <div>
+                <div className="text-[10px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8a8f93" }}>Past</div>
+                {past.map((loc, i) => <Card key={i} loc={loc} />)}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PipRow({ current, threshold, colorClass, size = "normal" }) {
   const pips = Array.from({ length: threshold }, (_, i) => i < current);
   const dim = size === "small" ? "w-3 h-3" : "w-4 h-4";
@@ -1834,6 +1899,18 @@ export default function CampaignDashboard() {
               🗒 NPC Summary
             </button>
             <button
+              onClick={() => setViewMode("locations")}
+              className="text-[12px] tracking-wide px-3 py-1.5 border transition-colors"
+              style={{
+                color: viewMode === "locations" ? "#101315" : "#e7e2d2",
+                background: viewMode === "locations" ? "#c9a15a" : "transparent",
+                borderColor: viewMode === "locations" ? "#c9a15a" : "#3a3f42",
+                fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
+              }}
+            >
+              🗺 Locations
+            </button>
+            <button
               onClick={() => setViewMode("notes")}
               className="text-[12px] tracking-wide px-3 py-1.5 border transition-colors"
               style={{
@@ -1893,6 +1970,8 @@ export default function CampaignDashboard() {
           />
         ) : viewMode === "npc" ? (
           <NPCSummaryPanel npcs={ledger.npcs || []} />
+        ) : viewMode === "locations" ? (
+          <LocationSummaryPanel locations={ledger.locations || []} />
         ) : viewMode === "notes" ? (
           <GMNotesPanel />
         ) : viewMode === "party" ? (
@@ -2066,15 +2145,21 @@ export default function CampaignDashboard() {
             <div className="flex items-start justify-between border-b pb-4 mb-5" style={{ borderColor: "#2a2e31" }}>
               <div className="flex items-start gap-4">
                 {active.portrait ? (
+                  // Fixed height, auto width: preserves whatever aspect ratio
+                  // was uploaded (tall character-card art, a square headshot,
+                  // a wide crop) instead of force-cropping everything into a
+                  // square. max-w caps how wide an unusually wide image can
+                  // get before it starts letterboxing (object-contain) rather
+                  // than blowing out the header row.
                   <img
                     src={active.portrait}
                     alt={`${active.name || "Character"} portrait`}
-                    className="w-16 h-16 object-cover flex-shrink-0 border"
-                    style={{ borderColor: "#3a3f42" }}
+                    className="h-20 w-auto max-w-[5rem] object-contain flex-shrink-0 border"
+                    style={{ borderColor: "#3a3f42", background: "#101315" }}
                   />
                 ) : (
                   <div
-                    className="w-16 h-16 flex-shrink-0 border flex items-center justify-center text-center px-1"
+                    className="h-20 w-16 flex-shrink-0 border flex items-center justify-center text-center px-1"
                     style={{ borderColor: "#3a3f42", background: "#101315" }}
                   >
                     <span className="text-[9px] tracking-[0.1em] uppercase leading-tight" style={{ color: "#5a5f62" }}>Not Uploaded</span>
