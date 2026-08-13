@@ -33,6 +33,7 @@ import { useState, useEffect, useRef } from "react";
 const LIVE_POLL_MS = 2_500;
 const SWEEP_MS = 950;
 const PULSE_MS = 2400;
+const COPY_CONFIRM_MS = 1500;
 
 const BLUE_TOKEN = "/images/blue-token.png";
 const RED_TOKEN = "/images/red-token.png";
@@ -216,6 +217,93 @@ function getDefense(character) {
 }
 
 // ---------------------------------------------------------------------------
+// Critical Injury reference — Table 6-10: Critical Injury Result from the
+// Edge of the Empire core rulebook. Ledger entries are free text (e.g.
+// "30 - Discouraging Wound" or a GM-authored one-off like "Grazed — minor
+// bleeding"), so lookupCriticalInjury() tries to match a leading d100 number
+// against the table's ranges first, then falls back to matching the injury's
+// name against the table by substring. GM-authored injuries with no d100
+// number and no matching name just won't expand — that's expected, not a
+// bug, since they were never meant to be table results in the first place.
+// ---------------------------------------------------------------------------
+const CRITICAL_INJURY_TABLE = [
+  { min: 1, max: 5, severity: "Easy (♦)", name: "Minor Nick", effect: "The target suffers 1 strain." },
+  { min: 6, max: 10, severity: "Easy (♦)", name: "Slowed Down", effect: "The target can only act during the last allied Initiative slot on his next turn." },
+  { min: 11, max: 15, severity: "Easy (♦)", name: "Sudden Jolt", effect: "The target drops whatever is in hand." },
+  { min: 16, max: 20, severity: "Easy (♦)", name: "Distracted", effect: "The target cannot perform a free maneuver during his next turn." },
+  { min: 21, max: 25, severity: "Easy (♦)", name: "Off-Balance", effect: "Add ▼ (Setback) to his next skill check." },
+  { min: 26, max: 30, severity: "Easy (♦)", name: "Discouraging Wound", effect: "Flip one light side Destiny Point to a dark side Destiny Point (reverse if NPC)." },
+  { min: 31, max: 35, severity: "Easy (♦)", name: "Stunned", effect: "The target is staggered until the end of his next turn." },
+  { min: 36, max: 40, severity: "Easy (♦)", name: "Stinger", effect: "Increase difficulty of next check by one." },
+  { min: 41, max: 45, severity: "Average (♦♦)", name: "Bowled Over", effect: "The target is knocked prone and suffers 1 strain." },
+  { min: 46, max: 50, severity: "Average (♦♦)", name: "Head Ringer", effect: "The target increases the difficulty of all Intellect and Cunning checks by one until the end of the encounter." },
+  { min: 51, max: 55, severity: "Average (♦♦)", name: "Fearsome Wound", effect: "The target increases the difficulty of all Presence and Willpower checks by one until the end of the encounter." },
+  { min: 56, max: 60, severity: "Average (♦♦)", name: "Agonizing Wound", effect: "The target increases the difficulty of all Brawn and Agility checks by one until the end of the encounter." },
+  { min: 61, max: 65, severity: "Average (♦♦)", name: "Slightly Dazed", effect: "The target is disoriented until the end of the encounter." },
+  { min: 66, max: 70, severity: "Average (♦♦)", name: "Scattered Senses", effect: "The target removes all ▲ (Boost) from skill checks until the end of the encounter." },
+  { min: 71, max: 75, severity: "Average (♦♦)", name: "Hamstrung", effect: "The target loses his free maneuver until the end of the encounter." },
+  { min: 76, max: 80, severity: "Average (♦♦)", name: "Overpowered", effect: "The target leaves himself open, and the attacker may immediately attempt another free attack against him, using the exact same pool as the original attack." },
+  { min: 81, max: 85, severity: "Average (♦♦)", name: "Winded", effect: "Until the end of the encounter, the target cannot voluntarily suffer strain to activate any abilities or gain additional maneuvers." },
+  { min: 86, max: 90, severity: "Average (♦♦)", name: "Compromised", effect: "Increase difficulty of all skill checks by one until the end of the encounter." },
+  { min: 91, max: 95, severity: "Hard (♦♦♦)", name: "At the Brink", effect: "The target suffers 1 strain each time he performs an action." },
+  { min: 96, max: 100, severity: "Hard (♦♦♦)", name: "Crippled", effect: "One of the target's limbs (selected by the GM) is crippled until healed or replaced. Increase difficulty of all checks that require use of that limb by one." },
+  { min: 101, max: 105, severity: "Hard (♦♦♦)", name: "Maimed", effect: "One of the target's limbs (selected by the GM) is permanently lost. Unless the target has a cybernetic replacement, the target cannot perform actions that would require the use of that limb. All other actions gain ▲ (Boost)." },
+  { min: 106, max: 110, severity: "Hard (♦♦♦)", name: "Horrific Injury", effect: "Randomly roll 1d10 to determine one of the target's characteristics — 1-3 Brawn, 4-6 Agility, 7 Intellect, 8 Cunning, 9 Presence, 10 Willpower. Until this Critical Injury is healed, treat that characteristic as one point lower." },
+  { min: 111, max: 115, severity: "Hard (♦♦♦)", name: "Temporarily Lame", effect: "Until this Critical Injury is healed, the target cannot perform more than one maneuver during his turn." },
+  { min: 116, max: 120, severity: "Hard (♦♦♦)", name: "Blinded", effect: "The target can no longer see. Upgrade the difficulty of all checks twice. Upgrade the difficulty of Perception and Vigilance checks three times." },
+  { min: 121, max: 125, severity: "Hard (♦♦♦)", name: "Knocked Senseless", effect: "The target is staggered for the remainder of the encounter." },
+  { min: 126, max: 130, severity: "Daunting (♦♦♦♦)", name: "Gruesome Injury", effect: "Randomly roll 1d10 to determine one of the target's characteristics — 1-3 Brawn, 4-6 Agility, 7 Intellect, 8 Cunning, 9 Presence, 10 Willpower. That characteristic is permanently reduced by one, to a minimum of one." },
+  { min: 131, max: 140, severity: "Daunting (♦♦♦♦)", name: "Bleeding Out", effect: "Every round, the target suffers 1 wound and 1 strain at the beginning of his turn. For every five wounds he suffers beyond his wound threshold, he suffers one additional Critical Injury — roll on this chart (if this result comes up again this way, roll again)." },
+  { min: 141, max: 150, severity: "Daunting (♦♦♦♦)", name: "The End is Nigh", effect: "The target will die after the last Initiative slot during the next round." },
+  { min: 151, max: 9999, severity: "Dead", name: "Dead", effect: "Complete, obliterated death." },
+];
+
+function lookupCriticalInjury(text) {
+  if (!text) return null;
+  const numMatch = /^\s*(\d{1,4})\s*[-–—:]/.exec(text);
+  if (numMatch) {
+    const n = parseInt(numMatch[1], 10);
+    const byNumber = CRITICAL_INJURY_TABLE.find((r) => n >= r.min && n <= r.max);
+    if (byNumber) return byNumber;
+  }
+  const lower = text.toLowerCase();
+  return CRITICAL_INJURY_TABLE.find((r) => lower.includes(r.name.toLowerCase())) || null;
+}
+
+// Selectable tile for one Critical Injury — click to expand the full
+// Table 6-10 effect text (if the injury matches a known table result).
+// GM-authored injuries with no match just show their recorded text with no
+// expandable detail.
+function CriticalInjuryTile({ text }) {
+  const [expanded, setExpanded] = useState(false);
+  const match = lookupCriticalInjury(text);
+  return (
+    <div
+      onClick={() => setExpanded((e) => !e)}
+      className="cursor-pointer border px-3 py-2 transition-colors"
+      style={{ borderColor: "#c23b3b44", background: expanded ? "#c23b3b1a" : "#c23b3b0d" }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[13px]" style={{ color: "#e7e2d2" }}>▸ {text}</span>
+        <span className="flex items-center gap-2 flex-shrink-0">
+          {match && (
+            <span className="text-[10px] tracking-[0.15em] uppercase px-1.5 py-0.5" style={{ color: "#c23b3b", border: "1px solid #c23b3b66" }}>
+              {match.severity}
+            </span>
+          )}
+          <span className="text-[11px]" style={{ color: "#5a5f62" }}>{expanded ? "▲" : "▼"}</span>
+        </span>
+      </div>
+      {expanded && (
+        <div className="mt-2 pt-2 border-t text-[12px] leading-relaxed" style={{ borderColor: "#c23b3b33", color: "#8a8f93" }}>
+          {match ? match.effect : "No matching Table 6-10 entry found for this injury — check the GM's notes for its effect."}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Shared dice roller — exact FFG face tables (see FFG Dice Tables reference
 // in the GM project knowledge). Rolls are computed client-side with
 // Math.random(), never fudged or approximated. Results are posted to a small
@@ -329,6 +417,22 @@ function rollPool(pool) {
 function poolLabel(pool) {
   const parts = DIE_TYPES.filter((dt) => (pool[dt.key] || 0) > 0).map((dt) => `${pool[dt.key]} ${dt.label}`);
   return parts.length ? parts.join(", ") : "No dice selected";
+}
+
+// Plain-text one-liner for a shared-log entry, meant for pasting into a
+// Discord/text chat when someone needs to reference a roll outside the
+// dashboard itself. Deliberately plain text — no icons, no markup.
+function formatRollForClipboard(entry) {
+  const parts = [];
+  if (entry.netSuccess > 0) parts.push(`${entry.netSuccess} Success`);
+  else if (entry.netSuccess < 0) parts.push(`${Math.abs(entry.netSuccess)} Failure`);
+  else parts.push("Failure");
+  if (entry.netAdvantage > 0) parts.push(`${entry.netAdvantage} Advantage`);
+  else if (entry.netAdvantage < 0) parts.push(`${Math.abs(entry.netAdvantage)} Threat`);
+  if (entry.triumph > 0) parts.push(`${entry.triumph} Triumph`);
+  if (entry.despair > 0) parts.push(`${entry.despair} Despair`);
+  const pool = entry.poolLabel ? `${entry.poolLabel} — ` : "";
+  return `${entry.player || "Unnamed"}: ${pool}${parts.join(", ")}`;
 }
 
 // Custom "new roll landed in the shared log" sound — Cameron's own uploaded
@@ -458,7 +562,13 @@ function difficultyTierLabel(pool) {
   return `${total} Difficulty (${tierName})${upgraded ? " (Upgraded)" : ""}`;
 }
 
-function DiceCounter({ dieType, count, onChange }) {
+// Hard cap on how many of any single die type the roller will hold — FFG
+// pools essentially never get anywhere close to this in practice, it's just
+// a sane ceiling so a mis-click can't run a counter up indefinitely.
+const MAX_DICE_PER_TYPE = 8;
+
+function DiceCounter({ dieType, count, onChange, max = MAX_DICE_PER_TYPE }) {
+  const atMax = count >= max;
   return (
     <div className="flex items-center justify-between border px-3 py-2" style={{ borderColor: "#2a2e31" }}>
       <span className="flex items-center gap-2 text-[13px]" style={{ color: "#e7e2d2" }}>
@@ -475,9 +585,10 @@ function DiceCounter({ dieType, count, onChange }) {
         </button>
         <span className="w-5 text-center mono-num" style={{ color: "#e7e2d2" }}>{count}</span>
         <button
-          onClick={() => onChange(count + 1)}
+          onClick={() => onChange(Math.min(max, count + 1))}
+          disabled={atMax}
           className="w-6 h-6 border text-[13px] leading-none"
-          style={{ borderColor: "#3a3f42", color: "#8a8f93" }}
+          style={{ borderColor: "#3a3f42", color: "#8a8f93", opacity: atMax ? 0.4 : 1, cursor: atMax ? "not-allowed" : "pointer" }}
         >
           +
         </button>
@@ -513,6 +624,11 @@ function DiceRollerPanel({
   const [log, setLog] = useState([]);
   const [logStatus, setLogStatus] = useState({ status: "idle" });
   const pollRef = useRef(null);
+  // Which shared-log entry (by id) just had its result copied to the
+  // clipboard — drives a brief "Copied!" confirmation badge, cleared after
+  // COPY_CONFIRM_MS.
+  const [copiedEntryId, setCopiedEntryId] = useState(null);
+  const copiedTimerRef = useRef(null);
 
   // Chime on new shared-log entries. soundOn is mirrored into a ref because
   // fetchLog's setInterval closure is created once on mount and would
@@ -527,6 +643,8 @@ function DiceRollerPanel({
   }, [soundOn]);
   const hasFetchedRef = useRef(false);
   const prevTopIdRef = useRef(undefined);
+
+  useEffect(() => () => clearTimeout(copiedTimerRef.current), []);
 
   const fetchLog = async () => {
     try {
@@ -577,7 +695,7 @@ function DiceRollerPanel({
   }, [preset?.nonce]);
 
   function updateDie(key, value) {
-    setPool((p) => ({ ...p, [key]: value }));
+    setPool((p) => ({ ...p, [key]: Math.max(0, Math.min(MAX_DICE_PER_TYPE, value)) }));
     // A manual edit to Difficulty or Challenge means the pool no longer
     // reflects any one of the 9 preset buttons — deselect.
     if (key === "difficulty" || key === "challenge") {
@@ -595,7 +713,7 @@ function DiceRollerPanel({
   // Challenge-die upgrade, since that belonged to whichever tier was
   // selected before) and marks it as the selected button.
   function selectDifficultyPreset(id, count) {
-    setPool((p) => ({ ...p, difficulty: count, challenge: 0 }));
+    setPool((p) => ({ ...p, difficulty: Math.min(MAX_DICE_PER_TYPE, count), challenge: 0 }));
     setSelectedDifficultyPreset(id);
   }
 
@@ -604,14 +722,14 @@ function DiceRollerPanel({
   // in effect at once, so picking one sets Boost/Setback to exactly what
   // it represents (clearing the other) rather than stacking.
   function selectManeuver(id, boost, setback) {
-    setPool((p) => ({ ...p, boost, setback }));
+    setPool((p) => ({ ...p, boost: Math.min(MAX_DICE_PER_TYPE, boost), setback: Math.min(MAX_DICE_PER_TYPE, setback) }));
     setSelectedManeuver(id);
   }
 
   // FFG "upgrade" rule: converts one Ability die into a Proficiency die.
   function upgradeAbilityToProficiency() {
     setPool((p) => {
-      if ((p.ability || 0) <= 0) return p;
+      if ((p.ability || 0) <= 0 || (p.proficiency || 0) >= MAX_DICE_PER_TYPE) return p;
       return { ...p, ability: p.ability - 1, proficiency: (p.proficiency || 0) + 1 };
     });
   }
@@ -619,7 +737,7 @@ function DiceRollerPanel({
   // FFG "upgrade" rule: converts one Difficulty die into a Challenge die.
   function upgradeDifficultyToChallenge() {
     setPool((p) => {
-      if ((p.difficulty || 0) <= 0) return p;
+      if ((p.difficulty || 0) <= 0 || (p.challenge || 0) >= MAX_DICE_PER_TYPE) return p;
       return { ...p, difficulty: p.difficulty - 1, challenge: (p.challenge || 0) + 1 };
     });
   }
@@ -677,6 +795,34 @@ function DiceRollerPanel({
     } catch (err) {
       setLogStatus({ status: "error", msg: err.message });
     }
+  }
+
+  // Click a shared-log entry to copy its result as plain text (for pasting
+  // into Discord/chat elsewhere). navigator.clipboard requires a secure
+  // context (HTTPS) and can be blocked by browser permissions, so this
+  // falls back to a hidden-textarea + execCommand copy if it throws.
+  async function handleCopyEntry(entry) {
+    const text = formatRollForClipboard(entry);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch {
+        return; // Copy genuinely unavailable — don't show a false "Copied!"
+      }
+    }
+    setCopiedEntryId(entry.id);
+    clearTimeout(copiedTimerRef.current);
+    copiedTimerRef.current = setTimeout(() => setCopiedEntryId(null), COPY_CONFIRM_MS);
   }
 
   const forceDie = DIE_TYPES.find((d) => d.key === "force");
@@ -839,13 +985,13 @@ function DiceRollerPanel({
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={upgradeAbilityToProficiency}
-              disabled={(pool.ability || 0) <= 0}
+              disabled={(pool.ability || 0) <= 0 || (pool.proficiency || 0) >= MAX_DICE_PER_TYPE}
               className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5"
               style={{
                 background: "linear-gradient(90deg, #6fae60 0%, #6fae60 50%, #e8c547 50%, #e8c547 100%)",
                 color: "#101315",
-                opacity: (pool.ability || 0) <= 0 ? 0.4 : 1,
-                cursor: (pool.ability || 0) <= 0 ? "not-allowed" : "pointer",
+                opacity: (pool.ability || 0) <= 0 || (pool.proficiency || 0) >= MAX_DICE_PER_TYPE ? 0.4 : 1,
+                cursor: (pool.ability || 0) <= 0 || (pool.proficiency || 0) >= MAX_DICE_PER_TYPE ? "not-allowed" : "pointer",
                 fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
               }}
             >
@@ -855,13 +1001,13 @@ function DiceRollerPanel({
             </button>
             <button
               onClick={upgradeDifficultyToChallenge}
-              disabled={(pool.difficulty || 0) <= 0}
+              disabled={(pool.difficulty || 0) <= 0 || (pool.challenge || 0) >= MAX_DICE_PER_TYPE}
               className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5"
               style={{
                 background: "linear-gradient(90deg, #8a5ec8 0%, #8a5ec8 50%, #c23b3b 50%, #c23b3b 100%)",
                 color: "#f5f5f0",
-                opacity: (pool.difficulty || 0) <= 0 ? 0.4 : 1,
-                cursor: (pool.difficulty || 0) <= 0 ? "not-allowed" : "pointer",
+                opacity: (pool.difficulty || 0) <= 0 || (pool.challenge || 0) >= MAX_DICE_PER_TYPE ? 0.4 : 1,
+                cursor: (pool.difficulty || 0) <= 0 || (pool.challenge || 0) >= MAX_DICE_PER_TYPE ? "not-allowed" : "pointer",
                 fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
               }}
             >
@@ -937,7 +1083,21 @@ function DiceRollerPanel({
           ) : (
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {log.map((entry) => (
-                <div key={entry.id} className="pb-3" style={{ borderBottom: "1px solid #2a2e31" }}>
+                <div
+                  key={entry.id}
+                  className="relative pb-3 cursor-pointer hover:opacity-80 transition-opacity"
+                  style={{ borderBottom: "1px solid #2a2e31" }}
+                  onClick={() => handleCopyEntry(entry)}
+                  title="Click to copy this roll's result"
+                >
+                  {copiedEntryId === entry.id && (
+                    <span
+                      className="absolute right-0 -top-1 text-[10px] tracking-[0.15em] uppercase px-2 py-0.5"
+                      style={{ color: "#6fae60", background: "#101315", border: "1px solid #6fae6066" }}
+                    >
+                      Copied!
+                    </span>
+                  )}
                   <div className="flex justify-between text-[12px] mb-1.5">
                     <span style={{ color: "#5ec8d8" }}>{entry.player}</span>
                     <span style={{ color: "#5a5f62" }}>{new Date(entry.ts).toLocaleTimeString()}</span>
@@ -1192,7 +1352,6 @@ export default function CampaignDashboard() {
   const [ledger, setLedger] = useState(DEMO_LEDGER);
   const [activeIdx, setActiveIdx] = useState(0);
   const [viewMode, setViewMode] = useState("character");
-  const [tab, setTab] = useState("overview");
   const [booted, setBooted] = useState(false);
   const [showSource, setShowSource] = useState(false);
   const [pasteText, setPasteText] = useState("");
@@ -1648,7 +1807,12 @@ export default function CampaignDashboard() {
                       {party.map((p, i) => {
                         const n = (p.vitals?.criticalInjuries || []).length;
                         return (
-                          <td key={i} className="py-1 pb-2 px-2 text-[14px]">
+                          <td
+                            key={i}
+                            className={`py-1 pb-2 px-2 text-[14px] ${n > 0 ? "cursor-pointer hover:opacity-70 transition-opacity" : ""}`}
+                            onClick={n > 0 ? () => { setActiveIdx(i); setViewMode("character"); } : undefined}
+                            title={n > 0 ? "Click to view this character's Critical Injuries" : undefined}
+                          >
                             {n === 0 ? (
                               <span style={{ color: "#3a3f42" }}>—</span>
                             ) : (
@@ -1718,13 +1882,30 @@ export default function CampaignDashboard() {
 
           <div className={`p-5 sm:p-7 ${booted ? "flicker-in" : ""}`}>
             <div className="flex items-start justify-between border-b pb-4 mb-5" style={{ borderColor: "#2a2e31" }}>
-              <div>
-                <div className="text-[11px] tracking-[0.25em] uppercase mb-1" style={{ color: "#5ec8d8" }}>PERSONNEL FILE</div>
-                <h1 className="text-2xl sm:text-3xl uppercase tracking-wide" style={{ color: "#e7e2d2", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
-                  {active.name || "Unknown"}
-                </h1>
-                <div className="text-[13px] mt-0.5" style={{ color: "#8a8f93" }}>
-                  {active.career || "—"} {active.species ? `· ${active.species}` : ""}
+              <div className="flex items-start gap-4">
+                {active.portrait ? (
+                  <img
+                    src={active.portrait}
+                    alt={`${active.name || "Character"} portrait`}
+                    className="w-16 h-16 object-cover flex-shrink-0 border"
+                    style={{ borderColor: "#3a3f42" }}
+                  />
+                ) : (
+                  <div
+                    className="w-16 h-16 flex-shrink-0 border flex items-center justify-center text-center px-1"
+                    style={{ borderColor: "#3a3f42", background: "#101315" }}
+                  >
+                    <span className="text-[9px] tracking-[0.1em] uppercase leading-tight" style={{ color: "#5a5f62" }}>Not Uploaded</span>
+                  </div>
+                )}
+                <div>
+                  <div className="text-[11px] tracking-[0.25em] uppercase mb-1" style={{ color: "#5ec8d8" }}>PERSONNEL FILE</div>
+                  <h1 className="text-2xl sm:text-3xl uppercase tracking-wide" style={{ color: "#e7e2d2", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
+                    {active.name || "Unknown"}
+                  </h1>
+                  <div className="text-[13px] mt-0.5" style={{ color: "#8a8f93" }}>
+                    {active.career || "—"} {active.species ? `· ${active.species}` : ""}
+                  </div>
                 </div>
               </div>
               <div className="text-right text-[11px]" style={{ color: "#5a5f62" }}>
@@ -1735,26 +1916,7 @@ export default function CampaignDashboard() {
               </div>
             </div>
 
-            <div className="flex gap-2 mb-5">
-              {[["overview", "Overview"], ["sheet", "Character Sheet"]].map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setTab(key)}
-                  className="text-[11px] tracking-[0.15em] uppercase px-4 py-2 border transition-colors"
-                  style={{
-                    color: tab === key ? "#101315" : "#8a8f93",
-                    background: tab === key ? "#5ec8d8" : "transparent",
-                    borderColor: tab === key ? "#5ec8d8" : "#3a3f42",
-                    fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {tab === "overview" && (
-              <>
+            <>
                 <div className="grid sm:grid-cols-2 gap-x-8">
                   <div>
                     <Stat label={`Wounds — ${wounds.current} / ${wounds.threshold}`} live={overlay.woundsLive}>
@@ -1798,9 +1960,9 @@ export default function CampaignDashboard() {
                 {crits.length > 0 && (
                   <div className="mt-2 mb-5 p-3 border" style={{ borderColor: "#c23b3b44", background: "#c23b3b11" }}>
                     <div className="text-[11px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#c23b3b" }}>Critical Injuries</div>
-                    <ul className="text-[13px] space-y-1" style={{ color: "#e7e2d2" }}>
-                      {crits.map((crit, i) => <li key={i}>▸ {crit}</li>)}
-                    </ul>
+                    <div className="space-y-1.5">
+                      {crits.map((crit, i) => <CriticalInjuryTile key={i} text={crit} />)}
+                    </div>
                   </div>
                 )}
 
@@ -1817,10 +1979,8 @@ export default function CampaignDashboard() {
                   </div>
                 </div>
               </>
-            )}
 
-            {tab === "sheet" && (
-              <>
+            <>
                 {(mo.motivation || obligation.type) && (
                   <div className="space-y-3 mb-5 pb-5 border-b" style={{ borderColor: "#2a2e31" }}>
                     {mo.motivation && (
@@ -1931,16 +2091,25 @@ export default function CampaignDashboard() {
                           </tr>
                         </thead>
                         <tbody>
-                          {weapons.map((w, i) => (
-                            <tr key={i} style={{ borderTop: "1px solid #2a2e31" }}>
-                              <td className="py-1.5 pr-2">{w.name}</td>
-                              <td className="py-1.5 pr-2" style={{ color: "#8a8f93" }}>{w.skill}</td>
-                              <td className="py-1.5 pr-2 mono-num">{w.damage}</td>
-                              <td className="py-1.5 pr-2 mono-num">{w.crit}</td>
-                              <td className="py-1.5 pr-2">{w.range}</td>
-                              <td className="py-1.5" style={{ color: "#5ec8d8" }}>{w.special}</td>
-                            </tr>
-                          ))}
+                          {weapons.map((w, i) => {
+                            const weaponSkill = skills.find((s) => s.name === w.skill);
+                            return (
+                              <tr
+                                key={i}
+                                style={{ borderTop: "1px solid #2a2e31" }}
+                                className={weaponSkill ? "cursor-pointer hover:opacity-70 transition-opacity" : ""}
+                                onClick={weaponSkill ? () => loadSkillIntoRoller(weaponSkill, active.name || "Unknown") : undefined}
+                                title={weaponSkill ? `Load ${w.skill} into Dice Roller` : undefined}
+                              >
+                                <td className="py-1.5 pr-2">{w.name}</td>
+                                <td className="py-1.5 pr-2" style={{ color: "#8a8f93" }}>{w.skill}</td>
+                                <td className="py-1.5 pr-2 mono-num">{w.damage}</td>
+                                <td className="py-1.5 pr-2 mono-num">{w.crit}</td>
+                                <td className="py-1.5 pr-2">{w.range}</td>
+                                <td className="py-1.5" style={{ color: "#5ec8d8" }}>{w.special}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -1956,7 +2125,6 @@ export default function CampaignDashboard() {
                   )}
                 </div>
               </>
-            )}
           </div>
         </div>
         )}
