@@ -23,10 +23,12 @@
   // backend, which is available on the Workers Free plan.
   "durable_objects": {
     "bindings": [
-      { "name": "ROLL_LOG", "class_name": "RollLog" }
+      { "name": "ROLL_LOG", "class_name": "RollLog" },
+      { "name": "NOTES_LOG", "class_name": "NotesLog" }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["RollLog"] }
+    { "tag": "v1", "new_sqlite_classes": ["RollLog"] },
+    { "tag": "v2", "new_sqlite_classes": ["NotesLog"] }
   ]
 }

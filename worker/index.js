@@ -211,6 +211,94 @@ export class RollLog {
   }
 }
 
+// --- Shared GM notes log (Durable Object) -----------------------------------
+// Same pattern and same reasons as RollLog above (serialized writes, strongly
+// consistent reads, one fixed instance shared by the whole campaign). Players
+// submit short free-text notes from the character sheet (e.g. desired XP
+// spends); the GM reads them from a "GM Inbox" panel. Ephemeral and separate
+// from the ledger — the GM still actions notes manually in the ledger repo,
+// this is just the inbox.
+const NOTES_LOG_MAX = 40;
+const NOTE_TEXT_MAX = 500;
+
+export class NotesLog {
+  constructor(ctx, env) {
+    this.ctx = ctx;
+    this.env = env;
+    this.notes = [];
+    this.ctx.blockConcurrencyWhile(async () => {
+      this.notes = (await this.ctx.storage.get("notes")) || [];
+    });
+  }
+
+  async fetch(request) {
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
+    if (request.method === "GET") {
+      return new Response(JSON.stringify({ notes: this.notes }), {
+        status: 200,
+        headers: { "content-type": "application/json", "cache-control": "no-store", ...CORS_HEADERS },
+      });
+    }
+
+    if (request.method === "POST") {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { "content-type": "application/json", ...CORS_HEADERS } });
+      }
+
+      const text = String(body?.text ?? "").trim().slice(0, NOTE_TEXT_MAX);
+      if (!text) {
+        return new Response(JSON.stringify({ error: "Note text is required" }), { status: 400, headers: { "content-type": "application/json", ...CORS_HEADERS } });
+      }
+
+      const entry = {
+        id: crypto.randomUUID(),
+        ts: Date.now(),
+        player: String(body?.player ?? "Unknown").slice(0, 40),
+        text,
+        read: false,
+      };
+
+      this.notes.unshift(entry);
+      this.notes = this.notes.slice(0, NOTES_LOG_MAX);
+      await this.ctx.storage.put("notes", this.notes);
+
+      return new Response(JSON.stringify({ ok: true, entry }), {
+        status: 200,
+        headers: { "content-type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    if (request.method === "DELETE") {
+      let id = null;
+      try {
+        const body = await request.json();
+        id = body?.id ?? null;
+      } catch {
+        // no body / not JSON -> treat as "clear all"
+      }
+
+      if (id) {
+        this.notes = this.notes.filter((n) => n.id !== id);
+      } else {
+        this.notes = [];
+      }
+      await this.ctx.storage.put("notes", this.notes);
+      return new Response(JSON.stringify({ ok: true, notes: this.notes }), {
+        status: 200,
+        headers: { "content-type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    return new Response("Method not allowed", { status: 405, headers: CORS_HEADERS });
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -228,6 +316,17 @@ export default {
       // campaign shares exactly one authoritative roll log.
       const id = env.ROLL_LOG.idFromName("shared-roll-log");
       const stub = env.ROLL_LOG.get(id);
+      return stub.fetch(request);
+    }
+    if (url.pathname === "/notes") {
+      if (!env.NOTES_LOG) {
+        return new Response(JSON.stringify({ error: "NOTES_LOG Durable Object not bound on this Worker yet — see setup note in worker/index.js", notes: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json", "cache-control": "no-store", ...CORS_HEADERS },
+        });
+      }
+      const id = env.NOTES_LOG.idFromName("shared-notes-log");
+      const stub = env.NOTES_LOG.get(id);
       return stub.fetch(request);
     }
     return env.ASSETS.fetch(request);

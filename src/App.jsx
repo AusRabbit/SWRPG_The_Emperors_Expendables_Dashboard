@@ -303,6 +303,65 @@ function CriticalInjuryTile({ text }) {
   );
 }
 
+// A short free-text note from a player to the GM (e.g. desired XP spend),
+// posted to the shared /notes Durable Object (same pattern as the dice
+// roller's /rolls log — see NotesLog in worker/index.js). Purely additive:
+// never touches wounds/strain/destiny/XP itself, just puts a message in the
+// GM's inbox for them to action manually.
+function GMNoteBox({ characterName }) {
+  const [text, setText] = useState("");
+  const [status, setStatus] = useState({ state: "idle" });
+
+  async function handleSend() {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setStatus({ state: "sending" });
+    try {
+      const res = await fetch("/notes", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ player: characterName || "Unknown", text: trimmed }),
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      setText("");
+      setStatus({ state: "sent" });
+      setTimeout(() => setStatus({ state: "idle" }), COPY_CONFIRM_MS);
+    } catch (err) {
+      setStatus({ state: "error", msg: err.message });
+    }
+  }
+
+  return (
+    <div className="mt-5 pt-5 border-t" style={{ borderColor: "#2a2e31" }}>
+      <div className="text-[11px] tracking-[0.2em] uppercase mb-2" style={{ color: "#8a8f93" }}>Note to GM</div>
+      <p className="text-[11px] leading-relaxed mb-2" style={{ color: "#5a5f62" }}>
+        e.g. desired XP expenditure. Sent to the GM's shared inbox — not saved to the ledger automatically.
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={`Note from ${characterName || "your character"}...`}
+        rows={3}
+        maxLength={500}
+        className="w-full bg-transparent border px-2 py-1.5 text-[13px]"
+        style={{ borderColor: "#3a3f42", color: "#e7e2d2" }}
+      />
+      <div className="flex items-center gap-3 mt-2">
+        <button
+          onClick={handleSend}
+          disabled={!text.trim() || status.state === "sending"}
+          className="text-[11px] tracking-wide uppercase px-3 py-1.5 disabled:opacity-40"
+          style={{ background: "#e0763a", color: "#101315", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}
+        >
+          {status.state === "sending" ? "Sending…" : "Send to GM"}
+        </button>
+        {status.state === "sent" && <span className="text-[12px]" style={{ color: "#6fae60" }}>Sent ✔</span>}
+        {status.state === "error" && <span className="text-[12px]" style={{ color: "#c23b3b" }}>Failed to send: {status.msg}</span>}
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Shared dice roller — exact FFG face tables (see FFG Dice Tables reference
 // in the GM project knowledge). Rolls are computed client-side with
@@ -1210,6 +1269,115 @@ function NPCSummaryPanel({ npcs }) {
   );
 }
 
+// GM-facing inbox for the shared /notes log (see GMNoteBox above and
+// NotesLog in worker/index.js). Polls like the dice roller's log, but on a
+// slower cadence since notes are low-frequency and not time-critical.
+function GMNotesPanel() {
+  const [notes, setNotes] = useState([]);
+  const [status, setStatus] = useState({ status: "idle" });
+  const pollRef = useRef(null);
+
+  const fetchNotes = async () => {
+    try {
+      const res = await fetch(`/notes?_=${Date.now()}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      setNotes(Array.isArray(data.notes) ? data.notes : []);
+      setStatus({ status: "ok" });
+    } catch (err) {
+      setStatus({ status: "error", msg: err.message });
+    }
+  };
+
+  useEffect(() => {
+    fetchNotes();
+    pollRef.current = setInterval(fetchNotes, 3000);
+    return () => clearInterval(pollRef.current);
+  }, []);
+
+  async function handleDismiss(id) {
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    try {
+      await fetch("/notes", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+    } catch {
+      // best-effort — a stale re-fetch will bring it back if this failed
+    }
+  }
+
+  async function handleClearAll() {
+    setNotes([]);
+    try {
+      await fetch("/notes", { method: "DELETE" });
+    } catch {
+      // best-effort
+    }
+  }
+
+  return (
+    <div className="relative overflow-hidden border" style={{ borderColor: "#3a3f42", background: "#16191b", boxShadow: "0 0 30px rgba(224,118,58,0.06)" }}>
+      <div className="p-5 sm:p-7">
+        <div className="flex items-start justify-between gap-3 mb-1 flex-wrap">
+          <div className="text-[11px] tracking-[0.25em] uppercase" style={{ color: "#e0763a" }}>GM ONLY · SHARED SESSION TOOL</div>
+          {notes.length > 0 && (
+            <button
+              onClick={handleClearAll}
+              className="text-[11px] tracking-[0.15em] uppercase px-3 py-1.5 border transition-colors"
+              style={{ color: "#8a8f93", borderColor: "#3a3f42", fontFamily: "'Rajdhani', sans-serif" }}
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+        <h1 className="text-2xl sm:text-3xl uppercase tracking-wide mb-2" style={{ color: "#e7e2d2", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
+          GM Inbox
+        </h1>
+        <p className="text-[11px] leading-relaxed mb-5" style={{ color: "#5a5f62" }}>
+          Notes players send from their character sheet — desired XP spends and the like. Dismissing a note just clears
+          it from this inbox; nothing here writes to the ledger automatically.
+        </p>
+
+        {status.status === "error" && (
+          <p className="text-[12px] mb-3" style={{ color: "#c23b3b" }}>Couldn't load notes: {status.msg}</p>
+        )}
+
+        {notes.length === 0 ? (
+          <span className="text-[13px]" style={{ color: "#5a5f62" }}>No notes yet.</span>
+        ) : (
+          <div className="space-y-2.5">
+            {notes.map((n) => (
+              <div key={n.id} className="border p-3" style={{ borderColor: "#2a2e31", background: "#101315" }}>
+                <div className="flex items-start justify-between gap-3 mb-1">
+                  <span className="text-[13px]" style={{ color: "#e0763a", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
+                    {n.player}
+                  </span>
+                  <span className="flex items-center gap-3 flex-shrink-0">
+                    <span className="text-[11px]" style={{ color: "#5a5f62" }}>
+                      {n.ts ? new Date(n.ts).toLocaleString() : ""}
+                    </span>
+                    <button
+                      onClick={() => handleDismiss(n.id)}
+                      className="text-[11px] tracking-wide uppercase"
+                      style={{ color: "#5a5f62" }}
+                      title="Dismiss"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                </div>
+                <p className="text-[13px] leading-relaxed whitespace-pre-wrap" style={{ color: "#e7e2d2" }}>{n.text}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PipRow({ current, threshold, colorClass, size = "normal" }) {
   const pips = Array.from({ length: threshold }, (_, i) => i < current);
   const dim = size === "small" ? "w-3 h-3" : "w-4 h-4";
@@ -1665,6 +1833,18 @@ export default function CampaignDashboard() {
             >
               🗒 NPC Summary
             </button>
+            <button
+              onClick={() => setViewMode("notes")}
+              className="text-[12px] tracking-wide px-3 py-1.5 border transition-colors"
+              style={{
+                color: viewMode === "notes" ? "#101315" : "#e7e2d2",
+                background: viewMode === "notes" ? "#e0763a" : "transparent",
+                borderColor: viewMode === "notes" ? "#e0763a" : "#3a3f42",
+                fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
+              }}
+            >
+              ✉ GM Inbox
+            </button>
           </div>
         )}
 
@@ -1713,6 +1893,8 @@ export default function CampaignDashboard() {
           />
         ) : viewMode === "npc" ? (
           <NPCSummaryPanel npcs={ledger.npcs || []} />
+        ) : viewMode === "notes" ? (
+          <GMNotesPanel />
         ) : viewMode === "party" ? (
           <div className="relative overflow-hidden border" style={{ borderColor: "#3a3f42", background: "#16191b", boxShadow: "0 0 30px rgba(255,176,0,0.06)" }}>
             <div className="p-5 sm:p-7">
@@ -2124,6 +2306,8 @@ export default function CampaignDashboard() {
                     </>
                   )}
                 </div>
+
+                <GMNoteBox characterName={active.name} />
               </>
           </div>
         </div>
