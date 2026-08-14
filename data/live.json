@@ -2,5 +2,5 @@
   "destiny": { "light": 1, "dark": 3 },
   "wounds": { "eleena": 0, "kenno": 3, "vesh": 6 },
   "strain": { "eleena": 0, "kenno": 0, "vesh": 0 },
-  "initiative": { "order": ["pc", "pc", "npc", "npc"], "taken": 2 }
+  "initiative": { "order": ["pc", "pc", "npc", "npc"], "taken": 3 }
 }
