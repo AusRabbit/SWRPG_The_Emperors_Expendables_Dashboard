@@ -497,8 +497,7 @@ function formatRollForClipboard(entry) {
   else if (entry.netAdvantage < 0) parts.push(`${Math.abs(entry.netAdvantage)} Threat`);
   if (entry.triumph > 0) parts.push(`${entry.triumph} Triumph`);
   if (entry.despair > 0) parts.push(`${entry.despair} Despair`);
-  const pool = entry.poolLabel ? `${entry.poolLabel} — ` : "";
-  return `${entry.player || "Unnamed"}: ${pool}${parts.join(", ")}`;
+  return `${entry.player || "Unnamed"}: ${parts.join(", ")}`;
 }
 
 // Custom "new roll landed in the shared log" sound — Cameron's own uploaded
