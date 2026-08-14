@@ -2083,6 +2083,8 @@ export default function CampaignDashboard() {
                 {ledger.campaign || "The Party"}
               </h1>
 
+              <InitiativeTracker initiative={live.initiative} />
+
               <div className="border p-3 mb-4 flex items-center gap-6 flex-wrap" style={{ borderColor: "#ffb00055", background: "#ffb00009" }}>
                 <div className="text-[11px] tracking-[0.2em] uppercase flex items-center gap-1.5" style={{ color: "#ffb000" }}>
                   Party Destiny Pool
