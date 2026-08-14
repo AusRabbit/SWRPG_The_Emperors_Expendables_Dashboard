@@ -1,6 +1,6 @@
 {
-  "destiny": { "light": 1, "dark": 3 },
-  "wounds": { "eleena": 0, "kenno": 6, "vesh": 6 },
+  "destiny": { "light": 0, "dark": 4 },
+  "wounds": { "eleena": 10, "kenno": 6, "vesh": 6 },
   "strain": { "eleena": 0, "kenno": 0, "vesh": 0 },
-  "initiative": { "order": ["pc", "pc", "npc", "npc"], "taken": 3 }
+  "initiative": { "order": ["pc", "pc", "npc", "npc"], "taken": 0 }
 }
