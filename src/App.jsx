@@ -665,9 +665,105 @@ function DiceCounter({ dieType, count, onChange, max = MAX_DICE_PER_TYPE }) {
 
 const EMPTY_POOL = { proficiency: 0, ability: 0, boost: 0, challenge: 0, difficulty: 0, setback: 0, force: 0 };
 
+// --- Initiative tracker -----------------------------------------------------
+// Small combat-order strip, GM-maintained via live.json's "initiative" field
+// (fetched through the same /live proxy as Wounds/Strain/Destiny — see
+// CampaignDashboard's fetchLiveOverlay). Schema is deliberately minimal —
+// two fields, no round counter, no timestamp:
+//   "initiative": { "order": ["pc", "npc", "pc", "npc"], "taken": 2 }
+// "order" is the FIXED initiative order for the whole encounter (per the
+// table's own rules, slots are unnamed PC/NPC seats rolled once and reused
+// every round — it never needs to be reshuffled turn to turn). "taken" is
+// just how many seats, counting from the front, have already gone this
+// round. Update workflow is a single number: increment "taken" by 1 after
+// each turn; when it reaches order.length, wrap it back to 0 for the new
+// round — same order, no rewriting the array. The UI turns that one number
+// into the whole display: acted seats render darkened, the seat at index
+// "taken" is the one up now (highlighted + breathing), everything after is
+// still bright and waiting. A wrap back to 0 (taken decreasing) reads as a
+// full round completing and flashes gold instead of the usual cyan "this
+// just updated" flash.
+function InitiativeBox({ kind, spent, active }) {
+  const isPC = String(kind).toLowerCase() === "pc";
+  const baseColor = isPC ? "#3b82c2" : "#c23b3b";
+  return (
+    <div
+      className={`flex items-center justify-center text-[10px] flex-shrink-0 ${active ? "init-breathe" : ""}`}
+      style={{
+        width: 30, height: 30,
+        background: spent ? "#2a2e31" : baseColor,
+        color: spent ? "#5a5f62" : "#0d0f10",
+        fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
+        letterSpacing: "0.03em",
+        transition: "background 0.4s ease-out, color 0.4s ease-out",
+        border: active ? "1px solid #e7e2d2" : `1px solid ${spent ? "#3a3f42" : "rgba(0,0,0,0.35)"}`,
+      }}
+    >
+      {isPC ? "PC" : "NPC"}
+    </div>
+  );
+}
+
+function InitiativeTracker({ initiative }) {
+  const [flashColor, setFlashColor] = useState(null);
+  const flashTimerRef = useRef(null);
+  const prevRef = useRef(null);
+
+  const order = Array.isArray(initiative?.order) ? initiative.order : [];
+  const takenRaw = Number(initiative?.taken);
+  const taken = order.length ? Math.min(Math.max(0, Number.isFinite(takenRaw) ? takenRaw : 0), order.length) : 0;
+
+  useEffect(() => {
+    if (!initiative || order.length === 0) return;
+    const orderKey = JSON.stringify(order);
+    const prev = prevRef.current;
+    if (prev !== null) {
+      const changed = prev.orderKey !== orderKey || prev.taken !== taken;
+      if (changed) {
+        setFlashColor(taken < prev.taken ? "gold" : "cyan");
+        clearTimeout(flashTimerRef.current);
+        flashTimerRef.current = setTimeout(() => setFlashColor(null), 1100);
+      }
+    }
+    prevRef.current = { orderKey, taken };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initiative]);
+
+  useEffect(() => () => clearTimeout(flashTimerRef.current), []);
+
+  if (order.length === 0) return null;
+
+  const glow = flashColor === "gold" ? "255,176,0" : flashColor === "cyan" ? "94,200,216" : null;
+
+  return (
+    <div
+      className="border p-3 mb-4"
+      style={{
+        borderColor: "#3a3f42",
+        background: "#101315",
+        transition: "box-shadow 0.3s ease-out",
+        boxShadow: glow ? `0 0 22px 4px rgba(${glow},0.55)` : "0 0 0 0 rgba(0,0,0,0)",
+      }}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[11px] tracking-[0.2em] uppercase" style={{ color: "#5ec8d8" }}>
+          Initiative
+        </span>
+        <span className="w-1.5 h-1.5 rounded-full inline-block live-dot" style={{ background: "#6fae60" }} />
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {order.map((kind, i) => (
+          <InitiativeBox key={i} kind={kind} spent={i < taken} active={i === taken} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DiceRollerPanel({
   playerName, setPlayerName, preset, partyDestiny,
   destinyLive, destinyLightSweepOn, destinyDarkSweepOn, destinyLightDir, destinyDarkDir,
+  initiative,
 }) {
   const [pool, setPool] = useState(() => preset?.pool || EMPTY_POOL);
   const [loadedLabel, setLoadedLabel] = useState(preset?.label || null);
@@ -900,6 +996,7 @@ function DiceRollerPanel({
   return (
     <div className="relative overflow-hidden border" style={{ borderColor: "#3a3f42", background: "#16191b", boxShadow: "0 0 30px rgba(94,200,216,0.06)" }}>
       <div className="p-5 sm:p-7">
+        <InitiativeTracker initiative={initiative} />
         {partyDestiny && (
           <div className="border p-3 mb-4 flex items-center gap-6 flex-wrap" style={{ borderColor: "#ffb00055", background: "#ffb00009" }}>
             <div className="text-[11px] tracking-[0.2em] uppercase flex items-center gap-1.5" style={{ color: "#ffb000" }}>
@@ -1807,10 +1904,12 @@ export default function CampaignDashboard() {
         @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
         @keyframes sweepUp { 0% { clip-path: inset(100% 0 0 0); opacity: 1; } 55% { clip-path: inset(0 0 0 0); opacity: 1; } 100% { clip-path: inset(0 0 0 0); opacity: 0; } }
         @keyframes sweepDown { 0% { clip-path: inset(0 0 100% 0); opacity: 1; } 55% { clip-path: inset(0 0 0 0); opacity: 1; } 100% { clip-path: inset(0 0 0 0); opacity: 0; } }
+        @keyframes initBreathe { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(1.08); } }
         .boot-scan { position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, #5ec8d8, transparent); animation: scan 0.65s ease-out forwards; pointer-events: none; }
         .flicker-in { animation: flicker 1.4s ease-out; }
         .mono-num { font-variant-numeric: tabular-nums; }
         .live-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+        .init-breathe { animation: initBreathe 2.6s ease-in-out infinite; }
       `}</style>
 
       <div className="w-full max-w-3xl">
@@ -1967,6 +2066,7 @@ export default function CampaignDashboard() {
             destinyDarkSweepOn={destinyDarkSweepOn}
             destinyLightDir={lc.destinyLightDir}
             destinyDarkDir={lc.destinyDarkDir}
+            initiative={live.initiative}
           />
         ) : viewMode === "npc" ? (
           <NPCSummaryPanel npcs={ledger.npcs || []} />
