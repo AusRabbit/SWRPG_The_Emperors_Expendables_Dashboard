@@ -544,20 +544,24 @@ function playTriumphSound() {
   audio.play().catch(() => { /* blocked until a user gesture unlocks audio — see handleRoll */ });
 }
 
-// Icon + description readout of the current pool — sits next to Roll/Clear
-// pool so players can see exactly what's selected without reading a plain
-// count string.
+// Icons-only readout of the current pool — sits next to Roll/Clear pool so
+// players can see exactly what's selected at a glance. Renders one icon per
+// die (not a single icon + ×N count) so the row visibly grows/shrinks as
+// dice are added or removed — easier to recognise at a glance than mixing
+// icons with numerals. Each icon still carries its own alt/title text (see
+// DieFaceIcon) for anyone who needs the name.
 function SelectedDiceSummary({ pool, size = 18 }) {
   const active = DIE_TYPES.filter((dt) => (pool[dt.key] || 0) > 0);
   if (active.length === 0) {
     return <span className="text-[12px]" style={{ color: "#5a5f62" }}>No dice selected</span>;
   }
   return (
-    <span className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+    <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
       {active.map((dt) => (
-        <span key={dt.key} className="flex items-center gap-1.5 text-[12px]" style={{ color: "#e7e2d2" }}>
-          <DieFaceIcon img={dt.img} label={dt.label} size={size} />
-          {pool[dt.key]} {dt.label}
+        <span key={dt.key} className="flex items-center gap-1">
+          {Array.from({ length: pool[dt.key] }, (_, i) => (
+            <DieFaceIcon key={i} img={dt.img} label={dt.label} size={size} />
+          ))}
         </span>
       ))}
     </span>
