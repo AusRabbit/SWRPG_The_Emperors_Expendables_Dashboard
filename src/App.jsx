@@ -549,14 +549,21 @@ function playTriumphSound() {
 // die (not a single icon + ×N count) so the row visibly grows/shrinks as
 // dice are added or removed — easier to recognise at a glance than mixing
 // icons with numerals. Each icon still carries its own alt/title text (see
-// DieFaceIcon) for anyone who needs the name.
+// DieFaceIcon) for anyone who needs the name. Display order pairs each
+// upgraded die next to its base type (Proficiency before Ability, Challenge
+// before Difficulty) with no gap between type groups, so the row reads as
+// one continuous strip rather than clusters — display order only, doesn't
+// touch DIE_TYPES itself, which still drives the dice counters elsewhere.
+const POOL_DISPLAY_ORDER = ["proficiency", "ability", "boost", "challenge", "difficulty", "setback", "force"];
 function SelectedDiceSummary({ pool, size = 18 }) {
-  const active = DIE_TYPES.filter((dt) => (pool[dt.key] || 0) > 0);
+  const active = DIE_TYPES
+    .filter((dt) => (pool[dt.key] || 0) > 0)
+    .sort((a, b) => POOL_DISPLAY_ORDER.indexOf(a.key) - POOL_DISPLAY_ORDER.indexOf(b.key));
   if (active.length === 0) {
     return <span className="text-[12px]" style={{ color: "#5a5f62" }}>No dice selected</span>;
   }
   return (
-    <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+    <span className="flex flex-wrap items-center gap-y-1.5">
       {active.map((dt) => (
         <span key={dt.key} className="flex items-center gap-1">
           {Array.from({ length: pool[dt.key] }, (_, i) => (
@@ -907,6 +914,22 @@ function DiceRollerPanel({
     });
   }
 
+  // Undo one step of an upgrade mis-click. Pool-only, same as the upgrade
+  // functions above — never touches the destiny pool.
+  function downgradeProficiencyToAbility() {
+    setPool((p) => {
+      if ((p.proficiency || 0) <= 0 || (p.ability || 0) >= MAX_DICE_PER_TYPE) return p;
+      return { ...p, proficiency: p.proficiency - 1, ability: (p.ability || 0) + 1 };
+    });
+  }
+
+  function downgradeChallengeToDifficulty() {
+    setPool((p) => {
+      if ((p.challenge || 0) <= 0 || (p.difficulty || 0) >= MAX_DICE_PER_TYPE) return p;
+      return { ...p, challenge: p.challenge - 1, difficulty: (p.difficulty || 0) + 1 };
+    });
+  }
+
   async function handleRoll() {
     // Clicking Roll is a user gesture, so use it to "unlock" playback —
     // browsers block audio.play() until one has occurred on the page. Play
@@ -1166,6 +1189,20 @@ function DiceRollerPanel({
               </span>
             </button>
             <button
+              onClick={downgradeProficiencyToAbility}
+              disabled={(pool.proficiency || 0) <= 0 || (pool.ability || 0) >= MAX_DICE_PER_TYPE}
+              title="Undo: Proficiency → Ability"
+              className="w-7 h-7 flex items-center justify-center text-[13px] leading-none"
+              style={{
+                border: "1px solid #3a3f42",
+                color: "#8a8f93",
+                opacity: (pool.proficiency || 0) <= 0 || (pool.ability || 0) >= MAX_DICE_PER_TYPE ? 0.35 : 1,
+                cursor: (pool.proficiency || 0) <= 0 || (pool.ability || 0) >= MAX_DICE_PER_TYPE ? "not-allowed" : "pointer",
+              }}
+            >
+              ↺
+            </button>
+            <button
               onClick={upgradeDifficultyToChallenge}
               disabled={(pool.difficulty || 0) <= 0 || (pool.challenge || 0) >= MAX_DICE_PER_TYPE}
               className="text-[11px] tracking-[0.1em] uppercase px-3 py-1.5"
@@ -1180,6 +1217,20 @@ function DiceRollerPanel({
               <span className="inline-flex items-center gap-1.5">
                 <img src={RED_TOKEN} alt="Dark Side Destiny Point" style={{ width: 33, height: 33 }} /> (Difficulty → Challenge)
               </span>
+            </button>
+            <button
+              onClick={downgradeChallengeToDifficulty}
+              disabled={(pool.challenge || 0) <= 0 || (pool.difficulty || 0) >= MAX_DICE_PER_TYPE}
+              title="Undo: Challenge → Difficulty"
+              className="w-7 h-7 flex items-center justify-center text-[13px] leading-none"
+              style={{
+                border: "1px solid #3a3f42",
+                color: "#8a8f93",
+                opacity: (pool.challenge || 0) <= 0 || (pool.difficulty || 0) >= MAX_DICE_PER_TYPE ? 0.35 : 1,
+                cursor: (pool.challenge || 0) <= 0 || (pool.difficulty || 0) >= MAX_DICE_PER_TYPE ? "not-allowed" : "pointer",
+              }}
+            >
+              ↺
             </button>
           </div>
         </div>
