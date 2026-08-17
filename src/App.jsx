@@ -2479,6 +2479,8 @@ export default function CampaignDashboard() {
                   </div>
                 )}
 
+                <InitiativeTracker initiative={live.initiative} />
+
                 <div className="grid sm:grid-cols-2 gap-x-8 mb-5 pb-5 border-b" style={{ borderColor: "#2a2e31" }}>
                   <div>
                     <Stat label={`Wounds — ${wounds.current} / ${wounds.threshold}`} live={overlay.woundsLive}>
