@@ -277,11 +277,20 @@ function lookupCriticalInjury(text) {
   return CRITICAL_INJURY_TABLE.find((r) => lower.includes(r.name.toLowerCase())) || null;
 }
 
+// Turns a raw Table 6-10 roll result (a plain number, as recorded live in
+// data/live.json — see applyLiveOverlay) into the same "NN - Name" text
+// format the static ledger.json entries already use, so both render through
+// the same CriticalInjuryTile.
+function criticalInjuryTextFromNumber(n) {
+  const match = CRITICAL_INJURY_TABLE.find((r) => n >= r.min && n <= r.max);
+  return match ? `${n} - ${match.name}` : `Critical Injury ${n}`;
+}
+
 // Selectable tile for one Critical Injury — click to expand the full
 // Table 6-10 effect text (if the injury matches a known table result).
 // GM-authored injuries with no match just show their recorded text with no
 // expandable detail.
-function CriticalInjuryTile({ text }) {
+function CriticalInjuryTile({ text, live }) {
   const [expanded, setExpanded] = useState(false);
   const match = lookupCriticalInjury(text);
   return (
@@ -291,7 +300,16 @@ function CriticalInjuryTile({ text }) {
       style={{ borderColor: "#c23b3b44", background: expanded ? "#c23b3b1a" : "#c23b3b0d" }}
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[13px]" style={{ color: "#e7e2d2" }}>▸ {text}</span>
+        <span className="text-[13px] flex items-center gap-1.5" style={{ color: "#e7e2d2" }}>
+          ▸ {text}
+          {live && (
+            <span
+              className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"
+              style={{ background: "#6fae60", boxShadow: "0 0 4px #6fae6099" }}
+              title="Live-tracked — not yet consolidated into the ledger"
+            />
+          )}
+        </span>
         <span className="flex items-center gap-2 flex-shrink-0">
           {match && (
             <span className="text-[10px] tracking-[0.15em] uppercase px-1.5 py-0.5" style={{ color: "#c23b3b", border: "1px solid #c23b3b66" }}>
@@ -700,17 +718,23 @@ const EMPTY_POOL = { proficiency: 0, ability: 0, boost: 0, challenge: 0, difficu
 function InitiativeBox({ kind, spent, active }) {
   const isPC = String(kind).toLowerCase() === "pc";
   const baseColor = isPC ? "#3b82c2" : "#c23b3b";
+  // Spent seats stay tinted with their PC/NPC hue instead of going flat
+  // grey — a heavily darkened version of the same blue/red so "used" is
+  // still readable as PC or NPC at a glance, not just from the letters.
+  const spentBg = isPC ? "#182a3a" : "#3a1818";
+  const spentText = isPC ? "#4f7a9e" : "#9e4f4f";
+  const spentBorder = isPC ? "#26415a" : "#5a2626";
   return (
     <div
       className={`flex items-center justify-center text-[10px] flex-shrink-0 ${active ? "init-breathe" : ""}`}
       style={{
         width: 30, height: 30,
-        background: spent ? "#2a2e31" : baseColor,
-        color: spent ? "#5a5f62" : "#0d0f10",
+        background: spent ? spentBg : baseColor,
+        color: spent ? spentText : "#0d0f10",
         fontFamily: "'Rajdhani', sans-serif", fontWeight: 700,
         letterSpacing: "0.03em",
         transition: "background 0.4s ease-out, color 0.4s ease-out",
-        border: active ? "1px solid #e7e2d2" : `1px solid ${spent ? "#3a3f42" : "rgba(0,0,0,0.35)"}`,
+        border: active ? "1px solid #e7e2d2" : `1px solid ${spent ? spentBorder : "rgba(0,0,0,0.35)"}`,
       }}
     >
       {isPC ? "PC" : "NPC"}
@@ -1839,6 +1863,16 @@ function applyLiveOverlay(character, live) {
   const w = hasLive && liveId && live.wounds && live.wounds[liveId] != null ? live.wounds[liveId] : null;
   const s = hasLive && liveId && live.strain && live.strain[liveId] != null ? live.strain[liveId] : null;
   const d = hasLive && live.destiny ? live.destiny : null;
+  // Critical injuries tracked live are just Table 6-10 result numbers (the
+  // GM/chat records them as they're rolled, without waiting for a
+  // consolidation pass) — resolved here to the same "NN - Name" text the
+  // static ledger.json entries use, so both render identically. Additive
+  // only: these are appended alongside whatever's already in
+  // vitals.criticalInjuries, never replacing it.
+  const liveCritNums =
+    hasLive && liveId && live.criticalInjuries && Array.isArray(live.criticalInjuries[liveId])
+      ? live.criticalInjuries[liveId]
+      : [];
 
   const vitals = character.vitals || {};
   const staticWounds = vitals.wounds || { current: 0, threshold: 0 };
@@ -1852,6 +1886,7 @@ function applyLiveOverlay(character, live) {
     woundsLive: w != null,
     strainLive: s != null,
     destinyLive: !!d,
+    criticalInjuriesLive: liveCritNums.map((n) => criticalInjuryTextFromNumber(n)),
   };
 }
 
@@ -2038,7 +2073,11 @@ export default function CampaignDashboard() {
   const strain = overlay.strain;
   const destiny = overlay.destiny;
   const xp = active.xp || { available: 0, total: 0 };
-  const crits = v.criticalInjuries || [];
+  // Static (consolidated into ledger.json) entries first, then any rolled
+  // live since — see applyLiveOverlay's criticalInjuriesLive.
+  const staticCrits = v.criticalInjuries || [];
+  const liveCrits = overlay.criticalInjuriesLive || [];
+  const crits = [...staticCrits, ...liveCrits];
   const inv = active.inventory || [];
   const mo = active.motivationObligation || {};
   const obligation = mo.obligation || {};
@@ -2345,7 +2384,8 @@ export default function CampaignDashboard() {
                     <tr style={{ borderBottom: "1px solid #2a2e31" }}>
                       <td className="py-1 pb-2 text-[10px] tracking-[0.2em] uppercase" style={{ color: "#5a5f62" }}>Critical Injuries</td>
                       {party.map((p, i) => {
-                        const n = (p.vitals?.criticalInjuries || []).length;
+                        const liveCount = partyOverlays[i]?.criticalInjuriesLive?.length || 0;
+                        const n = (p.vitals?.criticalInjuries || []).length + liveCount;
                         return (
                           <td
                             key={i}
@@ -2361,6 +2401,7 @@ export default function CampaignDashboard() {
                                   <span key={k} className="w-2.5 h-2.5 inline-block" style={{ background: "#c23b3b" }} />
                                 ))}
                                 {n > 5 && <span className="text-[12px] mono-num" style={{ color: "#c23b3b" }}>+{n - 5}</span>}
+                                {liveCount > 0 && <span className="ml-1" style={{ color: "#6fae60" }}>●</span>}
                               </span>
                             )}
                           </td>
@@ -2481,20 +2522,25 @@ export default function CampaignDashboard() {
 
                 <InitiativeTracker initiative={live.initiative} />
 
+                <div className="border p-3 mb-4 flex items-center gap-6 flex-wrap" style={{ borderColor: "#ffb00055", background: "#ffb00009" }}>
+                  <div className="text-[11px] tracking-[0.2em] uppercase flex items-center gap-1.5" style={{ color: "#ffb000" }}>
+                    Destiny Pool (party)
+                    {overlay.destinyLive && (
+                      <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#6fae60" }} />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <DestinyTokens count={destiny.light} src={BLUE_TOKEN} alt="Light Side Destiny Point" sweepActive={destinyLightSweepOn} sweepDir={lc.destinyLightDir} sweepColor="#8fd3f4" />
+                    <span className="text-[11px]" style={{ color: "#8a8f93" }}>light</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <DestinyTokens count={destiny.dark} src={RED_TOKEN} alt="Dark Side Destiny Point" sweepActive={destinyDarkSweepOn} sweepDir={lc.destinyDarkDir} sweepColor="#c23b3b" />
+                    <span className="text-[11px]" style={{ color: "#8a8f93" }}>dark</span>
+                  </div>
+                </div>
+
                 <div className="grid sm:grid-cols-2 gap-x-8 mb-5 pb-5 border-b" style={{ borderColor: "#2a2e31" }}>
                   <div>
-                    <Stat label="Destiny Pool (party)" live={overlay.destinyLive}>
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1.5">
-                          <DestinyTokens count={destiny.light} src={BLUE_TOKEN} alt="Light Side Destiny Point" sweepActive={destinyLightSweepOn} sweepDir={lc.destinyLightDir} sweepColor="#8fd3f4" />
-                          <span className="text-[11px]" style={{ color: "#8a8f93" }}>light</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <DestinyTokens count={destiny.dark} src={RED_TOKEN} alt="Dark Side Destiny Point" sweepActive={destinyDarkSweepOn} sweepDir={lc.destinyDarkDir} sweepColor="#c23b3b" />
-                          <span className="text-[11px]" style={{ color: "#8a8f93" }}>dark</span>
-                        </div>
-                      </div>
-                    </Stat>
                     <Stat label="Experience — unspent">
                       <span className="text-xl mono-num" style={{ color: "#e7e2d2" }}>{xp.available}</span>
                     </Stat>
@@ -2523,9 +2569,19 @@ export default function CampaignDashboard() {
 
                 {crits.length > 0 && (
                   <div className="mb-5 p-3 border" style={{ borderColor: "#c23b3b44", background: "#c23b3b11" }}>
-                    <div className="text-[11px] tracking-[0.2em] uppercase mb-1.5" style={{ color: "#c23b3b" }}>Critical Injuries</div>
+                    <div className="text-[11px] tracking-[0.2em] uppercase mb-1.5 flex items-center gap-1.5" style={{ color: "#c23b3b" }}>
+                      Critical Injuries
+                      {liveCrits.length > 0 && (
+                        <span
+                          className="w-1.5 h-1.5 rounded-full inline-block"
+                          style={{ background: "#6fae60", boxShadow: "0 0 4px #6fae6099" }}
+                          title="Live-tracked — not yet consolidated into the ledger"
+                        />
+                      )}
+                    </div>
                     <div className="space-y-1.5">
-                      {crits.map((crit, i) => <CriticalInjuryTile key={i} text={crit} />)}
+                      {staticCrits.map((crit, i) => <CriticalInjuryTile key={`s${i}`} text={crit} />)}
+                      {liveCrits.map((crit, i) => <CriticalInjuryTile key={`l${i}`} text={crit} live />)}
                     </div>
                   </div>
                 )}
