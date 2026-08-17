@@ -721,9 +721,9 @@ function InitiativeBox({ kind, spent, active }) {
   // Spent seats stay tinted with their PC/NPC hue instead of going flat
   // grey — a heavily darkened version of the same blue/red so "used" is
   // still readable as PC or NPC at a glance, not just from the letters.
-  const spentBg = isPC ? "#182a3a" : "#3a1818";
-  const spentText = isPC ? "#4f7a9e" : "#9e4f4f";
-  const spentBorder = isPC ? "#26415a" : "#5a2626";
+  const spentBg = isPC ? "#0f1f2c" : "#2c0f0f";
+  const spentText = isPC ? "#3d6485" : "#85403d";
+  const spentBorder = isPC ? "#1c3247" : "#471c1c";
   return (
     <div
       className={`flex items-center justify-center text-[10px] flex-shrink-0 ${active ? "init-breathe" : ""}`}
