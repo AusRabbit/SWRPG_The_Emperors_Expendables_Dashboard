@@ -1132,6 +1132,11 @@ function DiceRollerPanel({
   return (
     <div className="relative overflow-hidden border" style={{ borderColor: "#3a3f42", background: "#16191b", boxShadow: "0 0 30px rgba(94,200,216,0.06)" }}>
       <div className="p-5 sm:p-7">
+        <div className="text-[11px] tracking-[0.25em] uppercase mb-1" style={{ color: "#5ec8d8" }}>SHARED SESSION TOOL</div>
+        <h1 className="text-2xl sm:text-3xl uppercase tracking-wide mb-4" style={{ color: "#e7e2d2", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
+          Dice Roller
+        </h1>
+
         <InitiativeTracker initiative={initiative} />
         {partyDestiny && (
           <div className="border p-3 mb-4 flex items-center gap-6 flex-wrap" style={{ borderColor: "#ffb00055", background: "#ffb00009" }}>
@@ -1151,11 +1156,6 @@ function DiceRollerPanel({
             </div>
           </div>
         )}
-
-        <div className="text-[11px] tracking-[0.25em] uppercase mb-1" style={{ color: "#5ec8d8" }}>SHARED SESSION TOOL</div>
-        <h1 className="text-2xl sm:text-3xl uppercase tracking-wide mb-4" style={{ color: "#e7e2d2", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700 }}>
-          Dice Roller
-        </h1>
 
         <div className="mb-4">
           <label className="text-[11px] tracking-[0.2em] uppercase block mb-1.5" style={{ color: "#8a8f93" }}>
@@ -2483,23 +2483,6 @@ export default function CampaignDashboard() {
 
                 <div className="grid sm:grid-cols-2 gap-x-8 mb-5 pb-5 border-b" style={{ borderColor: "#2a2e31" }}>
                   <div>
-                    <Stat label={`Wounds — ${wounds.current} / ${wounds.threshold}`} live={overlay.woundsLive}>
-                      <div className="relative">
-                        <PipRow current={wounds.current} threshold={wounds.threshold} colorClass="#c23b3b" />
-                        <SweepOverlay active={woundsSweepOn} dir={woundsDir} color="#c23b3b" />
-                      </div>
-                    </Stat>
-                    <Stat label={`Strain — ${strain.current} / ${strain.threshold}`} live={overlay.strainLive}>
-                      <div className="relative">
-                        <PipRow current={strain.current} threshold={strain.threshold} colorClass="#ffb000" />
-                        <SweepOverlay active={strainSweepOn} dir={strainDir} color="#ffb000" />
-                      </div>
-                    </Stat>
-                    <Stat label="Soak">
-                      <span className="text-xl mono-num" style={{ color: "#e7e2d2" }}>{v.soak ?? "—"}</span>
-                    </Stat>
-                  </div>
-                  <div>
                     <Stat label="Destiny Pool (party)" live={overlay.destinyLive}>
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1.5">
@@ -2517,6 +2500,23 @@ export default function CampaignDashboard() {
                     </Stat>
                     <Stat label="Credits">
                       <span className="text-xl mono-num" style={{ color: "#ffb000" }}>{(active.credits ?? 0).toLocaleString()}</span>
+                    </Stat>
+                  </div>
+                  <div>
+                    <Stat label={`Wounds — ${wounds.current} / ${wounds.threshold}`} live={overlay.woundsLive}>
+                      <div className="relative">
+                        <PipRow current={wounds.current} threshold={wounds.threshold} colorClass="#c23b3b" />
+                        <SweepOverlay active={woundsSweepOn} dir={woundsDir} color="#c23b3b" />
+                      </div>
+                    </Stat>
+                    <Stat label={`Strain — ${strain.current} / ${strain.threshold}`} live={overlay.strainLive}>
+                      <div className="relative">
+                        <PipRow current={strain.current} threshold={strain.threshold} colorClass="#ffb000" />
+                        <SweepOverlay active={strainSweepOn} dir={strainDir} color="#ffb000" />
+                      </div>
+                    </Stat>
+                    <Stat label="Soak">
+                      <span className="text-xl mono-num" style={{ color: "#e7e2d2" }}>{v.soak ?? "—"}</span>
                     </Stat>
                   </div>
                 </div>
