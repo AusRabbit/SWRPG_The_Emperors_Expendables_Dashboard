@@ -177,6 +177,7 @@ export class RollLog {
         ts: Date.now(),
         player: String(body?.player ?? "Unknown").slice(0, 40),
         poolLabel: String(body?.poolLabel ?? "").slice(0, 200),
+        weaponNote: body?.weaponNote ? String(body.weaponNote).slice(0, 200) : null,
         pool,
         rolls,
         netSuccess: Number.isFinite(body?.netSuccess) ? body.netSuccess : 0,
